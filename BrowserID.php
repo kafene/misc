@@ -9,21 +9,27 @@
     should contain a called instance of this function to continue processing
  * @param $endpoint - BrowserID Consumer to use (e.g. persona.org)
  */
-function BrowserID_Handle($return_to = null, $endpoint = 'https://persona.org/verify')
-{
+function BrowserID_Handle(
+  $return_to = null
+, $endpoint = 'https://persona.org/verify'
+){
   // my guess here is pretty basic so you should probably pass this param in.
-  if(!$return_to) $return_to = '//'.getenv('SERVER_NAME').getenv('REQUEST_URI');
-  // Start a session if none active
-  if(session_status() != \PHP_SESSION_ACTIVE) session_start();
+  if(!$return_to)
+    $return_to = '//'.getenv('SERVER_NAME').getenv('REQUEST_URI');
+  // Start a session if none active. you should probably have one started.
+  if(session_status() != \PHP_SESSION_ACTIVE)
+    session_start();
   // Handle request to log out
   if(isset($_REQUEST['BrowserIDDestroy'])) {
     $_SESSION['BrowserIDAuth'] = false;
     unset($_SESSION['BrowserIDAuth']);
     exit(header("Location: $return_to"));
-  } elseif(isset($_POST['BrowserIDAssertion'])) { // Handle request to log in
+  }
+  // Handle request to log in
+  elseif(isset($_POST['BrowserIDAssertion'])) {
     $audience  = getenv('HTTP_HOST');
     $assertion = $_POST['BrowserIDAssertion'];
-    $query     = array('audience' => $audience, 'assertion' => $assertion);
+    $query = array('audience' => $audience, 'assertion' => $assertion);
     $ctx['method']  = 'POST';
     $ctx['header']  = 'Content-Type: application/x-www-form-urlencoded';
     $ctx['content'] = http_build_query($query);
@@ -34,7 +40,9 @@ function BrowserID_Handle($return_to = null, $endpoint = 'https://persona.org/ve
     } elseif(false === ($json = json_decode($res))) {
       throw new \Exception('['.$endpoint.']: Parsing Response JSON Failed.');
     } elseif(!isset($json->status) || $json->status == 'failure') {
-      $reason = empty($json->reason) ? 'Reason unavailable.' : $json->reason;
+      $reason = empty($json->reason)
+        ? 'Reason unavailable.'
+        : $json->reason;
       throw new \Exception('['.$endpoint.']: '.$reason);
     } else {
       if($json->status == 'okay' && isset($json->email)) {
@@ -47,34 +55,28 @@ function BrowserID_Handle($return_to = null, $endpoint = 'https://persona.org/ve
       // Redirect to continue processing.
       exit(header('Location: '.$return_to));
     }
-  } else { // Last case, return HTML forms.
+  }
+  // Last case, return HTML forms.
+  else {
     // Log-out form if logged in
     if(isset($_SESSION['BrowserIDAuth'])) {
-      $user = $_SESSION['BrowserIDAuth'];
-      return '
-        <form method="post" id="BrowserIDLogout">
-        <input type="submit" name="BrowserIDDestroy" value="Log Out ['.$user.']">
-        </form>
-      ';
+      $u = $_SESSION['BrowserIDAuth'];
+      return '<form method="post" id="BrowserIDLogout">
+      <input type="submit" name="BrowserIDDestroy" value="Log Out ['.$u.']">
+      </form>';
     }
-    return // Log-in form if not logged in
-     '<form id="BrowserIDLogin" method="POST" action="'.$return_to.'">
-      <input id="BrowserIDAssertion" type="hidden" name="BrowserIDAssertion">
-      <script src="https://login.persona.org/include.js"></script>
-      <script type="text/javascript">
-        function BrowserIDVerify() {
-          navigator.id.get(function(assertion) {
-            if(assertion) {
-              document.getElementById("BrowserIDAssertion").value = assertion;
-              document.getElementById("BrowserIDLogin").submit();
-            } else {
-              alert("BrowserID Assertion Failed.");
-            }
-          }); 
-        }
-      </script>
-      <a href="#" onclick="BrowserIDVerify();">Log In [Persona]</a>
-      </form>
-    ';
+    // Log-in form if not logged in
+    return '<form id="BrowserIDLogin" method="POST" action="'.$return_to.'">
+    <input id="BrowserIDAssertion" type="hidden" name="BrowserIDAssertion">
+    <script src="https://login.persona.org/include.js"></script>
+    <script>function BrowserIDVerify() {
+      navigator.id.get(function(assertion) {
+        if(assertion) {
+          document.getElementById("BrowserIDAssertion").value = assertion;
+          document.getElementById("BrowserIDLogin").submit();
+        } else { alert("BrowserID Assertion Failed."); }
+    });}</script>
+    <a href="#" onclick="BrowserIDVerify();">Log In [Persona]</a>
+    </form>';
   }
 }

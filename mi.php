@@ -7,4 +7,5 @@ die("<xmp theme=cerulean><div style='width:60%;margin:0 auto'><h1><a href=$B>$C
 </a></h1>\n".(@$E?:'# '.@file_get_contents($D))."</xmp><title>$C</title><script
 src=//strapdownjs.com/v/0.1/strapdown.js></script>");}#mi('p/');
 
-// its code golf. its a blog. kinda.
+ // its code golf. its a blog. kinda.
+ 

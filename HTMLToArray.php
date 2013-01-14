@@ -1,7 +1,7 @@
 <?php
 
+# Requires: Tidy, SimpleXML, DOM
 function html_to_array($html) {
-  if(!extensions_loaded('Tidy','SimpleXML','DOM','THROW=1')){}
   $html = tidy_parse_string($html)->cleanRepair();
   $dom = new \DOMDocument;
   $dom->loadHTML($html);
@@ -14,7 +14,8 @@ function _html_to_array(\SimpleXMLElement $html) {
   $cs = $attrs = array();
   $name = strtolower((string)$html->getName());
   $text = trim((string)$html);
-  if(strlen($text) <= 0) $text = null;
+  if(strlen($text) <= 0)
+    $text = null;
   if(is_object($html)) foreach($ns as $_ns => $nsu) {
     $oattrs = $html->attributes($_ns, true);
     foreach($oattrs as $attrn => $attrv) {
@@ -28,5 +29,6 @@ function _html_to_array(\SimpleXMLElement $html) {
       $cs[$cname][] = self::_html_to_array($child);
     }
   }
-  return array('name'=>$name,'text'=>$text,'attrs'=>$attrs,'children'=>$cs);
+  return array('name'  => $name,   'text'    => $text
+             , 'attrs' => $attrs, 'children' => $cs);
 }

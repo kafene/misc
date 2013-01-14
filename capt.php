@@ -1,4 +1,4 @@
-<?php
+<?php namespace kafene;
 
 /*
 __capt__ (capt. hook, get it?)
@@ -59,13 +59,15 @@ class capt {
   }
   static function unhook($e, callable $fn = null) {
     if(!$fn) unset(static::$hooks[$e]);
-    elseif(false !== ($i = array_search($fn, static::$hooks[$e], true)))
+    elseif(false !== ($i = array_search($fn
+    , static::$hooks[$e], true)))
       unset(static::$hooks[$e][$i]);
   }
   static function fire($e = null) {
+    if(count(func_get_args()) > 1)
+      $args = array_slice(func_get_args(), 1);
     foreach(array_key_exists($e, static::$hooks)
     ? static::$hooks[$e] : array() as $fn)
-      call_user_func_array($fn
-      , array_slice(func_get_args(), 1));
+      return call_user_func_array($fn, $args);
   }
 }
