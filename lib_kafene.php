@@ -324,5 +324,15 @@ function array_transpose(array $array) {
 }
 
 
+function log_write($message, $severity = LOG_DEBUG, $file = ) {
+    if(!filter_var(ini_get('log_errors', FILTER_VALIDATE_BOOLEAN))) { return; }
+    $file = ini_get('error_log') ?: 'php://stderr';
+    $severity = addcslashes(strval($severity), '"');
+    $message = addcslashes(strval($message), '"')."\n";
+    $line = sprintf('"%s", "%s", "%s"', time(), $severity, $message);
+    return error_log($line, $file ? 3 : 0, $file);
+}
+
+
 
 
