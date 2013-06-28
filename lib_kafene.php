@@ -334,5 +334,20 @@ function log_write($message, $severity = LOG_DEBUG, $file = ) {
 }
 
 
-
+function get_request_method($allow_override = true) {
+    if($allow_override) {
+        $post = array_change_key_case($_POST, CASE_LOWER);
+        if(isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
+            $method = $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'];
+        } elseif(isset($post['_method'])) {
+            $method = $post['_method'];
+        }
+    }
+    if(empty($method)) {
+        $method = isset($_SERVER['REQUEST_METHOD'])
+            ? $_SERVER['REQUEST_METHOD']
+            : 'GET';
+    }
+    return strtolower($method);
+}
 
