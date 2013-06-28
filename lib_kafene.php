@@ -351,3 +351,37 @@ function get_request_method($allow_override = true) {
     return strtolower($method);
 }
 
+function is_ascii($str) {
+    return !preg_match('/[^\x00-\x7F]/S', $str);
+}
+
+function url($url, $dns = false) {
+    return is_string(filter_var($url, FILTER_VALIDATE_URL))
+        && (!$dns || (false !== checkdnsrr($url, 'ANY')));
+}
+
+function is_email($str, $mx = false) {
+    return is_string(filter_var($str, FILTER_VALIDATE_EMAIL))
+        && (!$mx || getmxrr(ltrim(strrchr($str, '@'), '@'), $x));
+}
+
+function session_started() {
+    $active = [PHP_SESSION_ACTIVE, PHP_SESSION_DISABLED];
+    return in_array(session_status(), $active);
+}
+
+function is_https() {
+    return filter_var(getenv('HTTPS'), FILTER_VALIDATE_BOOLEAN);
+}
+
+function get_base_uri()  {
+    $request_uri = getenv('REQUEST_URI') ?: getenv('PHP_SELF');
+    $script_name = getenv('SCRIPT_NAME') ?: null;
+    $base_uri = strpos($request_uri, $script_name) === 0
+        ? $script_name
+        : strtr(dirname($script_name), '\\', '/');
+    return rtrim($base_uri, '/');
+}
+
+
+
