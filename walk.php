@@ -1,5 +1,7 @@
 <?php
 
+# This is something like array_map, except recursive, and with additional arguments.
+# Only used it once but I found it useful for whatever purpose it had, so... here.
 function walk(callable $func, array $array, array $args = []) {
     $parent = __NAMESPACE__ .'\\'. __FUNCTION__;
     return array_map(function($v) use ($func, $args, $parent) {
@@ -8,7 +10,7 @@ function walk(callable $func, array $array, array $args = []) {
             : call_user_func_array($func, array_merge([0 => $v], $args));
     }, $array);
 }
-/*
+
 $testArray = [
     'bob',
     'users' => ['bob', 'jill', 'sam'],
@@ -28,4 +30,4 @@ $testArray = [
 ];
 print '<PRE>';
 var_dump(walk('strtoupper', $testArray));
-*/
+
