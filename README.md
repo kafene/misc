@@ -1,19 +1,34 @@
 ## lib_kafene
 ===
 
-Library of functions/classes I am working on.
-I am working it into some kind of framework or something.
-Still needs some documentation. Tried to write self-documenting code.
-unless there's a citation for someone else (a link, copyright, etc),
-any code here is mine and I release it under the following license:
+Misc code, mostly PHP. Not all well documented.
 
+Unless there's a citation for someone else (a link, copyright, etc),
+any code here is mine and is licensed as follows:
 
-    COPYRIGHT (c) 2013 kafene.org <http://kafene.org/COPYING>
-    You may do anything with this work that any copyright law would normally
-    restrict, so long as you retain the above notice in all redistributed copies
-    and/or derived works. The works are provided `as-is` with no form of warranty.
+```
+This is free and unencumbered software released into the public domain.
 
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
 
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+```
+For more information, please refer to <http://unlicense.org/>
 
-See lib_kafene.php for more details.
