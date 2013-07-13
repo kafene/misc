@@ -11,12 +11,12 @@ $T</title><script src=//strapdownjs.com/v/0.1/strapdown.js></script>");}
 #
 # Possibly the world's smallest blog.
 # Make a folder called "p", or whatever you send to $Y (first argument)
+# Place posts with file extension of .md in it formatted as follows:
+# - First line of each post is the Title
+# - Second line is the date formatted YYYY-MM-DD
+# - Third line, leave blank
+# - The rest of the file is the contents of the post.
 # The blog site title is $T (second argument)
-# Place posts with file extension of .md in it
-# First line of each post is the Title
-# Second line is the date formatted YYYY-MM-DD
-# Third line, leave blank
-# The rest of the file is the contents of the post.
 # The front page will list posts sorted by date, newest first.
 # Clicking a post title goes to the post.
 # That's it.
