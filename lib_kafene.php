@@ -106,7 +106,7 @@ if(!function_exists('str_putcsv')) {
     function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
         $fh = fopen('php://temp', 'r+');
         fputcsv($fh, $input, $delimiter, $enclosure);
-        rewind($fh); # fseek($fp, 0);
+        rewind($fh);
         $data = fread($fh, 1048576);
         fclose($fh);
         return rtrim($data, "\n");
@@ -325,7 +325,7 @@ function array_transpose(array $array) {
 
 
 function log_write($message, $severity = LOG_DEBUG, $file = ) {
-    if(!filter_var(ini_get('log_errors', FILTER_VALIDATE_BOOLEAN))) { return; }
+    if(!filter_var(ini_get('log_errors', FILTER_VALIDATE_BOOLEAN))) return;
     $file = ini_get('error_log') ?: 'php://stderr';
     $severity = addcslashes(strval($severity), '"');
     $message = addcslashes(strval($message), '"')."\n";
@@ -351,6 +351,7 @@ function get_request_method($allow_override = true) {
     return strtolower($method);
 }
 
+
 function is_ascii($str) {
     return !preg_match('/[^\x00-\x7F]/S', $str);
 }
@@ -374,6 +375,7 @@ function is_https() {
     return filter_var(getenv('HTTPS'), FILTER_VALIDATE_BOOLEAN);
 }
 
+
 function get_base_uri()  {
     $request_uri = getenv('REQUEST_URI') ?: getenv('PHP_SELF');
     $script_name = getenv('SCRIPT_NAME') ?: null;
@@ -381,6 +383,50 @@ function get_base_uri()  {
         ? $script_name
         : strtr(dirname($script_name), '\\', '/');
     return rtrim($base_uri, '/');
+}
+
+
+# Simple key-value storage/cache
+function c($key = null, $value = null) {
+    static $_cache = [];
+    $argc = func_num_args();
+    if (0 === $argc) { # get all
+        return $_cache;
+    } elseif (is_array($key)) { # Set array of [key => val]
+        foreach ($key as $k => $v) c($k, $v);
+    } elseif (2 === $argc) { # Set key => val, or unset - c(false, key)
+        if (false === $key) unset($_cache[$value]);
+        else return $_cache[$key] = $value;
+    } elseif (1 === $argc && $key) { # Get key if set
+        return array_key_exists($key, $_cache) ? $_cache[$key] : null;
+    }
+}
+
+
+# Replacement for PHP 5.4 header_register_callback until it's functional.
+function header_callback(callable $callback = null, $priority = 0) {
+    static $callbacks = 'header_callback::firstRun';
+    if ('header_callback::firstRun' === $callbacks) {
+        header_register_callback(__FUNCTION__);
+        $callbacks = [];
+    }
+    if (null === $callback) {
+        ksort($callbacks);
+        array_map('call_user_func', $callbacks);
+        return;
+    } elseif ($priority) {
+        $callbacks[(int) $priority] = $callback;
+    } else {
+        $callbacks[] = $callback;
+    }
+}
+
+# Add a header string without writing an anonymous function to handle it:
+function header_add($string) {
+    $args = func_get_args();
+    header_callback(function() use ($args) {
+        header(call_user_func_array('sprintf', $args));
+    });
 }
 
 
