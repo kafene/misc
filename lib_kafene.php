@@ -405,12 +405,12 @@ function c($key = null, $value = null) {
 
 # Replacement for PHP 5.4 header_register_callback until it's functional.
 function header_callback(callable $callback = null, $priority = 0) {
-    static $callbacks = 'header_callback::firstRun';
-    if ('header_callback::firstRun' === $callbacks) {
+    static $callbacks;
+    if (null === $callbacks) {
         header_register_callback(__FUNCTION__);
         $callbacks = [];
     }
-    if (null === $callback) {
+    if (0 === func_num_args()) {
         ksort($callbacks);
         array_map('call_user_func', $callbacks);
         return;
