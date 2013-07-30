@@ -431,12 +431,13 @@ function header_add($string) {
 
 
 # transform markdown to html
+# regex from https://github.com/phuu/lowcarb/blob/master/lowcarb/minidown.php
 if (!function_exists('markdown')) {
 function markdown($str) {
-    $a = ["/\r?\n/", "/>/", "/\n{4,}/"];
-    $b = ["\n", "&gt;", "\n\n\n"];
-    $str = preg_replace($a, $b, stripslashes($str)."\n\n");
     $md = [
+        "/\r?\n/" => "\n",
+        "/>/" => "&gt;",
+        "/\n{4,}/" => "\n\n\n",
         "/\n+(&gt;\s{1}(.+))\n{2,}/i" => "<blockquote>$2</blockquote>\n",
         "/#+\s{1}(.+)\n+/i" => "<h3>$1</h3>\n",
         "/\((.+?)\)\[(\S+?)\]/i" => "<a href=\"$2\">$1</a>",
@@ -447,7 +448,11 @@ function markdown($str) {
         "/^(.+)\n+/i" => "<p>$1</p>\n",
         "/\n+(.+)[\n+\Z]?/im" => "<p>$1</p>\n",
     ];
-    return preg_replace(array_keys($md), array_values($md), $str);
+    return preg_replace(
+        array_keys($md),
+        array_values($md),
+        stripslashes($str)."\n\n"
+    );
 }
 }
 
