@@ -457,5 +457,14 @@ function markdown($str) {
 }
 
 
+function handlebar($path, $vars = []) {
+    return str_replace(
+        array_map(function ($v) {
+    	    return '{{'.$v.'}}';
+    	}, array_keys($vars)),
+    	array_values($vars),
+    	file_get_contents($path)
+	);
+}
 
 
