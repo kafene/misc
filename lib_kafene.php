@@ -430,4 +430,25 @@ function header_add($string) {
 }
 
 
+# transform markdown to html
+if (!function_exists('markdown')) {
+function markdown($string) {
+    $a = ["/\r?\n/", "/>/", "/\n{4,}/"];
+    $b = ["\n", "&gt;", "\n\n\n"];
+    return strtr(preg_replace($a, $b, stripslashes($string)."\n\n"), [
+        "/\n+(&gt;\s{1}(.+))\n{2,}/i" => "<blockquote>$2</blockquote>\n",
+        "/#+\s{1}(.+)\n+/i" => "<h3>$1</h3>\n",
+        "/\((.+?)\)\[(\S+?)\]/i" => "<a href=\"$2\">$1</a>",
+        "/\!\[(.+?)\]\((.+?)\)/i" => "<img src=\"$1\" alt=\"$2\">",
+        "/\n{2,}(-\s{1}(.+)\n{1}.+)/im" => "\n<ul>$1",
+        "/(-\s{1}(.+)\n)\n+/im" => "$1</ul>\n",
+        "/\n?(-\s{1}(.+))\n?/i" => "<li>$2</li>",
+        "/^(.+)\n+/i" => "<p>$1</p>\n",
+        "/\n+(.+)[\n+\Z]?/im" => "<p>$1</p>\n",
+    ]);
+}
+}
+
+
+
 
