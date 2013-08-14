@@ -58,7 +58,20 @@ class jsonResponse implements \jsonSerializable
         }
         if (is_string($data)) {
             $this->message = $data;
-        } elseif (is_array($data)) {
+            return $this;
+        }
+        if (is_object($data)) {
+            if (method_exists($data, 'getArrayCopy')) {
+                $data = $data->getArrayCopy();
+            } elseif (method_exists($data, 'toArray')) {
+                $data = $data->toArray();
+            } elseif ($data instanceof Traversable) {
+                $data = iterator_to_array($data);
+            } else {
+                $data = get_object_vars($data);
+            }
+        }
+        if (is_array($data)) {
             if (isset($data['message'])) {
                 $this->__set('message', $data['message']);
                 unset ($data['message']);
@@ -83,6 +96,10 @@ class jsonResponse implements \jsonSerializable
             throw new InvalidArgumentException('Data must be either an Array or String.');
         }
         return $this;
+    }
+
+    static function create($data = null) {
+        return new static($data);
     }
 
     /**
