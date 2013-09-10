@@ -530,4 +530,123 @@ $tpl->messages = [
 */
 
 
+# From https://github.com/Respect/Loader
+# I think it's clever.
+function Respect_Load($className) {
+    $fileParts = explode('\\', ltrim($className, '\\'));
+    if (false !== strpos(end($fileParts), '_')) {
+        array_splice($fileParts, -1, 1, explode('_', current($fileParts)));
+    }
+    $fileName = implode(DIRECTORY_SEPARATOR, $fileParts).'.php';
+    if (stream_resolve_include_path($fileName)) {
+        require $filename;
+    }
+}
+
+
+/**
+ * Check if all specified keys exist in the given array.
+ *
+ * @param array $keys The keys to search for
+ * @param array $array The array to search in
+ * @param boolean $strict If true, keys must be non-empty to "exist".
+ * @return boolean
+ */
+function array_keys_exist(array $keys, array $array, $strict = false) {
+    foreach ($keys as $key) {
+        if (!array_key_exists($key, $array)
+        || ($strict && empty($array[$key]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+# I need this.
+function ifsetor(&$var, $default = null) {
+    return isset($var) ? $var : $default;
+}
+
+# ifsetor alias
+function v(&$var, $default = null) {
+    return isset($var) ? $var : $default;
+}
+
+# Help to escape user input.
+function h($str, $flags = null, $charset = 'UTF-8', $double = false) {
+    $flags = $flags ?: (ENT_HTML5 | ENT_QUOTES);
+    return htmlspecialchars((string) $str, $flags, $charset, $double);
+}
+
+
+/**
+ * This takes a string and trims off start and ending pairs (brackets)
+ * E.g., "[(Something)]" => "Something", "[[[[[]]]]]" => ""
+ * Don't ask me why I used an anonymous function and a while loop, I just did.
+ *
+ * @param string $str
+ * @return string
+ */
+function trim_bounds($str) {
+    $str = trim($str);
+    if (strlen($str) < 2) {
+        return $str;
+    }
+    $tf = function (&$c) {
+        $c = trim($c);
+        $fc = $c[0];
+        $lc = $c[strlen($c) - 1];
+        if (
+            ('[' === $fc && ']' === $lc) ||
+            ('{' === $fc && '}' === $lc) ||
+            ('<' === $fc && '>' === $lc) ||
+            ('(' === $fc && ')' === $lc) ||
+            ('^' === $fc && '$' === $lc) ||
+            ($fc === $lc && !ctype_alnum($fc))
+        ) {
+            $c = substr($c, 1, strlen($c) - 2);
+            return true;
+        }
+    };
+    while ($tf($str));
+    return $str;
+}
+
+
+# Mini little stasher for vars.
+function stash($k, $v = null) {
+    session_id() or session_start();
+    $_ = '#stash#';
+    if (empty($_SESSION[$_])) {
+        $_SESSION[$_] = [];
+    }
+    if (func_num_args() === 1) {
+        return isset($_SESSION[$_][$k]) ? $_SESSION[$_][$k] : null;
+    }
+    return $_SESSION[$_][$k] = $v;
+}
+
+
+/**
+ * Crappy handler of flash messages.
+ */
+function flash($key, $msg = null, $now = false) {
+    static $x = [], $_ = '$flash$';
+    session_id() or session_start();
+    $c = isset($_SESSION[$_]) ? json_decode($_SESSION[$_], true) : [];
+    if (null === $msg) {
+        if (isset($c[$key])) {
+            $x[$key] = $c[$key];
+            unset($c[$key]);
+            $_SESSION[$_] = json_encode($c);
+        }
+        return isset($x[$key]) ? $x[$key] : null;
+    }
+    if (!$now) {
+        $c[$key] = $msg;
+        $_SESSION[$_] = json_encode($c);
+    }
+    return ($x[$key] = $msg);
+}
 
