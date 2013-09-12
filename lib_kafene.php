@@ -292,14 +292,14 @@ function array_from_xml($xml) {
 
 
 # Get all of items from $a that don't have keys in $keys
-function array_except(array $array, $keys) {
-    return array_diff_key($array, array_flip((array) $keys));
+function array_except(array $array, array $desired_keys) {
+    return array_diff_key($array, array_flip($desired_keys));
 }
 
 
 # Get a only items from the array with keys specified in $keys
-function array_only($a, $keys) {
-    return array_intersect_key($a, array_flip((array) $keys));
+function array_only(array $array, array $desired_keys) {
+    return array_intersect_key(array_flip($desired_keys), $array);
 }
 
 
