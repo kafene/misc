@@ -650,3 +650,16 @@ function flash($key, $msg = null, $now = false) {
     return ($x[$key] = $msg);
 }
 
+
+// Turns an array of constructor args into
+// an array of objects of the called class.
+trait Collectable
+{
+    public static function collect($posts)
+    {
+        $static = get_called_class();
+        return array_map(function ($post) use ($static) {
+            return new $static($post);
+        }, $posts);
+    }
+}
