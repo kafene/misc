@@ -663,3 +663,24 @@ trait Collectable
         }, $posts);
     }
 }
+
+
+
+# Determine if an IP is in a subnet
+# http://stackoverflow.com/questions/594112
+# E.g. ip_cidr_match('65.40.32.4', '65.40.0.0/64') == true
+function ip_cidr_match($ip, $other) {
+    $ip = (string) $ip;
+    $other = (string) $other;
+    if (false !== strpos($other, '/')) {
+        list($subnet, $mask) = explode('/', $other);
+        $ip = ip2long($ip);
+        $subnet = ip2long($subnet);
+        $mask = -1 << (32 - $bits);
+        $subnet &= $mask;
+        return ($ip & $mask) == $subnet;
+    } else {
+        return $ip == $other;
+    }
+}
+
