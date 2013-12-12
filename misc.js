@@ -26,6 +26,8 @@ function parseResponseHeaders(headers) {
     return ret;
 }
 
+
+
 // Get response headers from some URL,
 // return them parsed into a key/value object.
 function getResponseHeaders(url) {
@@ -36,4 +38,59 @@ function getResponseHeaders(url) {
     headers = req.getAllResponseHeaders() || null;
 
     return headers ? parseResponseHeaders(headers) : null;
+};
+
+
+
+// do callback to everything in obj
+function each(obj, callback) {
+    if (undefined === obj || null === obj) {
+        return;
+    }
+    if (obj.hasOwnProperty('length')) {
+        for (var i = 0; i < obj.length; i++) {
+            callback(obj[i], i, obj);
+        }
+    } else if ('object' == typeof(obj)) {
+        for (var i in obj) {
+            if (obj.hasOwnProperty(i)) {
+                callback(obj[i], i, obj);
+            }
+        }
+    } else {
+        callback(obj);
+    }
+}
+
+
+
+// markdown w/ marked on load
+function markedOnload() {
+    document.addEventListener('DOMContentLoaded', function () {
+        if ('function' != typeof(marked)) return;
+
+        // html-escape <pre><code> stuff beforehand so it displays okay.
+        [].forEach.call(document.querySelectorAll('.md pre code'), function (e) {
+            var d = document.createElement('div');
+            d.innerHTML = e.innerHTML;
+            e.innerHTML = d.innerHTML;
+        });
+
+        [].forEach.call(document.querySelectorAll('.md'), function (e) {
+            try { e.innerHTML = marked(e.innerHTML); } catch (a) {}
+        });
+    });
+};
+
+
+
+// export to define.amd, module.exports, or `context` (usually `this` (`window`))
+KF.export = function (name, context, definition) {
+    if ('undefined' != typeof(module) && module['exports']) {
+        module.exports = definition();
+    } else if ('function' == typeof(define) && define['amd']) {
+        define(definition);
+    } else {
+        context[name] = definition();
+    }
 };
