@@ -211,3 +211,66 @@ KF['injectCss'] = function (css) {
 
 
 
+KF['merge'] = function (dest, src) {
+    var srcs = [].slice.call(arguments, 1);
+    if ('object' != typeof(dest)) {
+        throw 'KF.merge: source/destination must be objects.';
+    }
+    for (var i in src) {
+        if (!src.hasOwnProperty(i)) continue;
+        dest[i] = src[i];
+    }
+    return src;
+};
+
+
+
+KF['parseUrl'] = function (url) {
+    if (!/\/\//.test(url)) return url;
+    var a = document.createElement('a');
+    a.href = url;
+    return a;
+};
+
+
+
+KF['define'] = function (scope, name, definition) {
+    if ('undefined' != typeof(module) && module.exports) {
+        module.exports = definition();
+    } else if ('function' == typeof('define') && define.amd) {
+        define(definition);
+    } else if (scope instanceof Window || scope instanceof window.Window) {
+        if ('object' == typeof(window.wrappedJSObject)) {
+            window.wrappedJSObject[name] = definition();
+        } else if ('object' == typeof(unsafeWindow)) {
+            unsafeWindow[name] = definition();
+        } else if (window.opera) {
+            window.opera.defineMagicVariable(name, function () {
+                return definition();
+            }, null);
+        }
+        scope[name] = definition();
+    } else {
+        scope[name] = definition();
+    }
+};
+
+
+
+KF['sprintf'] = function (str) {
+    var args = [].slice.call(arguments).slice(1);
+    return str.replace(/%s/g, function () {
+        return args.shift();
+    });
+};
+
+
+
+KF['await'] = function (testFn, readyFn) {
+    testFn() ? readyFn() : setTimeout(function() {
+        KF.await(testFn, readyFn);
+    }, 9);
+};
+
+
+
