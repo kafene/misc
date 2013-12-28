@@ -5,9 +5,36 @@
  * or immediately if it is already loaded, and during any
  * `DOMNodeInserted` events.
  */
- 
- var onNode;
+
+var onNode;
 (KF || {})['onNode'] = onNode = (function () {
+    /* Element.matches */
+    var matchesSelector = (function () {
+        var prot = window.Element.prototype;
+        var func;
+        if (prot.matches) {
+            return prot.matches;
+        } else if (prot.matchesSelector) {
+            return prot.matchesSelector;
+        } else if (prot.mozMatchesSelector) {
+            return prot.mozMatchesSelector;
+        } else if (prot.msMatchesSelector) {
+            return prot.msMatchesSelector;
+        } else if (prot.oMatchesSelector) {
+            return prot.oMatchesSelector;
+        } else if (prot.webkitMatchesSelector) {
+            return prot.webkitMatchesSelector;
+        } else {
+            return function (node, selector) {
+                var parent = node.parentNode || node.document;
+                var nodes = parent.querySelectorAll(selector);
+                var i = -1;
+                while (nodes[++i] && nodes[i] != node);
+                return !!nodes[i];
+            };
+        }
+    })();
+
     var onLoad = (function () {
         var callbacks;
         var isLoaded = /^loaded|complete/i.test(document.readyState);
