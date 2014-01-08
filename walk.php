@@ -1,33 +1,28 @@
 <?php
 
-# This is something like array_map, except recursive, and with additional arguments.
-# Only used it once but I found it useful for whatever purpose it had, so... here.
-function walk(callable $func, array $array, array $args = []) {
-    $parent = __NAMESPACE__ .'\\'. __FUNCTION__;
-    return array_map(function($v) use ($func, $args, $parent) {
-        return is_array($v)
-            ? $parent($func, $v, $args)
-            : call_user_func_array($func, array_merge([0 => $v], $args));
-    }, $array);
+# This is like array_walk_recursive, but it doesn't require using references,
+# and it can iterate over anything Traversable, not just arrays,
+# so for this reason it is not called "array_map_recursive"
+function rmap($it, callable $fn) {
+    foreach ($it as $i => &$v) {
+        $v = is_array($v) || is_object($v) ? rmap($v, $fn) : $fn($v, $i);
+    }
+    return $it;
 }
 
 $testArray = [
-    'bob',
-    'users' => ['bob', 'jill', 'sam'],
+    'users' => ['bob', 'jen', 'sam'],
     'people' => [
-        ['name' => 'bob', 'age' => 33, 'gender' => 'male'],
-        ['name' => 'jill','age' => 20, 'gender' => 'female'],
-        ['name' => 'sam', 'age' => 19, 'gender' => 'male']
+        ['name' => 'bob', 'age' => 33, 'gender' => 'm'],
+        ['name' => 'jen', 'age' => 20, 'gender' => 'f'],
+        ['name' => 'sam', 'age' => 19, 'gender' => 'm'],
     ],
     'cars' => [
-        'honda' => [
-            'owners' => ['jill'],
-        ],
-        'toyota' => [
-            'owners' => ['bob', 'sam'],
-        ],
+        'honda' => ['owners' => ['jen']],
+        'buick' => ['owners' => ['bob', 'sam']],
     ],
 ];
-print '<PRE>';
-var_dump(walk('strtoupper', $testArray));
 
+var_dump(rmap($testArray, function ($value) {
+    return strtoupper($value);
+}));
