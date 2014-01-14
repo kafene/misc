@@ -263,4 +263,31 @@ class ArrayUtil
             return array_shift($replacements);
         }, $subject);
     }
+    
+    # $modes = ['','a','ar','k','kr','r','nat','natcase'], $umodes = ['','k','a']
+    static function anysort(array $array, $mode = '', $f = SORT_REGULAR) {
+        if (is_callable($mode) || is_int($mode)) {
+            list($f, $mode) = [$mode, ''];
+        }
+
+        if (is_callable($f)) {
+            $func = strtolower("u{$mode}sort");
+            $func($array, $f);
+        } else {
+            $func = strtolower("{$mode}sort");
+            if (substr($func, 0, 3) == 'nat') {
+                $func($array);
+            } else {
+                $func($array, $f);
+            }
+        }
+
+        return $array;
+    }
+
+    # Shuffle without a reference
+    static function shuffle(array $array) {
+        shuffle($array);
+        return $array;
+    }
 }
