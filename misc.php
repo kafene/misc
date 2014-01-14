@@ -1,118 +1,234 @@
 <?php
 
-# Hashcash is a computationally expensive operation for the sender, while being
-# easily verified by the receiver. It proves this email was worth working for
-# and isn't spam. From - http://github.com/Xeoncross/kit
-function hashcash($email) {
-    $count = 0;
-    $hashcash = sprintf('1:20:%u:%s::%u', date('ymd'), $email, mt_rand());
-    while(strncmp('00000', sha1($hashcashc.$count), 5) !== 0) { ++$count; }
-    return $hashcash.$count;
-}
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-
-# Event Handler
-function event($name = null, $value = null) {
+function event($name, $value = null) {
     static $events = [];
-    # Name should be case insensitive.
-    $name = strtolower(basename($name));
-    # Get all - event();
-    if(0 === func_num_args()) {
-        return $events;
+
+    if (false === $name) {
+        unset($events[$value]);
+        return;
     }
-    # Remove by name - event('myevent', false);
-    elseif($name && false === $value) {
-        unset($events[$name]);
-    }
-    # Remove all - event(false);
-    elseif(empty($name) && null === $value) {
-        $events = [];
-    }
-    # Attach event - event('myevent', $func);
-    elseif(is_a($value, 'Closure')) {
-        $events[$name][] = $value;
-    }
-    # Fire event - event('myevent'), event('myevent', ['arg1', 'arg2']);
-    elseif($name && (is_array($value) || null === $value)) {
-        if(!is_array($value)) {
-            $value = [];
+
+    $name = strtolower($name);
+
+    if ($name && is_callable($value)) {
+        return $events[$name][] = $value;
+    } elseif ($name && isset($events[$name])) {
+        foreach($events[$name] as $callback) {
+            $callback($value);
         }
-        foreach(ifsetor($events[$name], []) as $fn) {
-            if(is_array($result = call_user_func_array($fn, $value))) {
-                $value = $result;
-            }
-        }
+
         return $value;
     }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+class DB {
+    protected $pdo;
+
+    function __construct(\PDO $pdo) {
+        $this->pdo = $pdo;
+        $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+    }
+
+    function &getConnection() {
+        return $this->pdo;
+    }
+
+    function prequery(\PDO $db, $sql) {
+        if (func_num_args() < 3) {
+            return $db->query($sql);
+        }
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute(array_slice(func_get_args(), 2));
+        return $stmt;
+    }
+
+    function __call($method, $args) {
+        return call_user_func_array([$this->pdo, $method], $args);
+    }
+
+    function escape($value) {
+        $value = str_replace(['\\',"\0" ,'`'], '', $value);
+        // $value = preg_replace('/[^A-Za-z0-9_.-]/', '', $value);
+        return $i;
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function server($key) {
+    foreach (["ORIG_$key", "REDIRECT_$key", $key] as $key) {
+        if (!empty($_SERVER[$key])) {
+            return $_SERVER[$key];
+        }
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function enable_cors($enable) {
+    if (false === $enable) {
+        header_remove("Access-Control-Allow-Origin");
+    } else {
+        header("Access-Control-Allow-Origin: *");
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Find files recursively in a given directory
 # Filtered by a regular expression pattern
 function rscandir($dir, $filter_pattern = '/.*/') {
-    if(!is_dir($dir)) { return []; }
+    if (!is_dir($dir = realpath($dir))) {
+        return [];
+    }
+
     $df = \FilesystemIterator::KEY_AS_PATHNAME
         | \FilesystemIterator::CURRENT_AS_FILEINFO
         | \FilesystemIterator::SKIP_DOTS
         | \FilesystemIterator::UNIX_PATHS;
-    # | \FilesystemIterator::FOLLOW_SYMLINKS;
+        #| \FilesystemIterator::FOLLOW_SYMLINKS;
     $rf = \RecursiveIteratorIterator::SELF_FIRST
         | \RecursiveIteratorIterator::CATCH_GET_CHILD;
     $rd = new \RecursiveDirectoryIterator($dir, $df);
     $it = new \RecursiveIteratorIterator($rd, $rf);
     $rx = new \RegexIterator($it, $filter_pattern);
+
     $found = iterator_to_array($rx);
     $files = array_filter(array_keys($found), 'is_file');
     $files = array_intersect_key($found, array_flip($files));
+
     return $files;
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Recursively remove a directory
-function remove_dir($path) {
-    if(is_link($path)) {
+function remove_directory($path) {
+    if (is_link($path)) {
         return unlink($path);
     }
-    foreach(new \RecursiveDirectoryIterator($path) as $file) {
-        if(in_array($f->getFilename(), ['.', '..'])) {
+
+    foreach (new \RecursiveDirectoryIterator($path) as $file) {
+        if (in_array($f->getFilename(), ['.', '..'])) {
             continue;
         }
-        if($file->isLink()) {
+
+        if ($file->isLink()) {
             unlink($file->getPathName());
             continue;
         }
-        if($file->isFile()) {
+
+        if ($file->isFile()) {
             unlink($file->getRealPath());
             continue;
         }
-        if($file->isDir()) {
+
+        if ($file->isDir()) {
             remove_dir($file->getRealPath());
         }
     }
+
     return rmdir($path);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Get the UNIX file permissions for a file, e.g. 0644, 0755
 function file_permissions($file) {
     return substr(sprintf('%o', fileperms($file)), -4);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # PHP lacks a str_putcsv function despite having str_getcsv
 # and fgetcsv/fputcsv. This uses an in-memory file handle and
 # fputcsv to simulate str_putcsv.
-if(!function_exists('str_putcsv')) {
-    function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
-        $fh = fopen('php://temp', 'r+');
-        fputcsv($fh, $input, $delimiter, $enclosure);
-        rewind($fh);
-        $data = fread($fh, 1048576);
-        fclose($fh);
-        return rtrim($data, "\n");
+if (!function_exists('str_putcsv')) {
+    function str_putcsv(array $fields, $delimiter = ',', $enclosure = '"') {
+        $fp = new \SplFileObject("php://memory", "r+");
+        $csv = "";
+        $fp->fputcsv($fields, $delimeter, $enclosure);
+        $fp->fseek(0);
+        while (!$fp->eof() && ($line = $fp->getCurrentLine())) {
+            $csv .= trim($line).PHP_EOL;
+        }
+        return trim($csv);
     }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function parse_xml($input) {
+    if (class_exists('SimpleXMLElement')) {
+        try {
+            $elbackup = libxml_disable_entity_loader(true);
+            $iebackup = libxml_use_internal_errors(true);
+            $result = new \SimpleXMLElement($input);
+            libxml_disable_entity_loader($elbackup);
+            libxml_use_internal_errors($iebackup);
+            return $result;
+        } catch (\Exception $e) {
+        }
+    }
+    return $input;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function sqlite_session_handler_init(\PDO $Q, $T = 'php_session') {
+    $Q->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+    $T = sprintf("`%s`", str_replace(["\"","'","`"], "_", $T));
+    return session_set_save_handler(function ($path, $name) use ($Q, $T) {
+        $cols = "id TEXT PRIMARY KEY,data TEXT,time INTEGER";
+        return $Q->query("CREATE TABLE IF NOT EXISTS {$T} ($cols);");
+    }, function () {
+        return true;
+    }, function ($id) use ($Q, $T) {
+            $s = $Q->prepare("SELECT data FROM {$T} WHERE id=? LIMIT 1");
+            $s->execute((string) $id);
+            $v = $s->fetchColumn();
+            $s->closeCursor();
+            return $v ? base64_decode($v) : null;
+    }, function ($id, $v) use ($Q, $T) {
+            $s = $Q->prepare("REPLACE INTO {$T} (data,time,id) VALUES(?,?,?)");
+            return $s->execute([base64_encode($v), time(), (string) $id]);
+    }, function ($id) use ($Q, $T) {
+            $s = $Q->prepare("DELETE FROM {$T} WHERE id=?");
+            return $s->execute([(string) $id]);
+    }, function ($max) use ($Q, $T) {
+            $s = $Q->prepare("DELETE FROM {$T} WHERE time<?");
+            return $s->execute([(int) (time() - $max)]);
+    });
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Change base of a number from one base to another
 # Without GMP, the maximum base_convert supports is 32
@@ -122,123 +238,82 @@ function rebase($n, $from = 10, $to = 62) {
         : base_convert($n, $from, $to);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-function get_iv($expires, $secret) {
+function create_iv($expires, $secret) {
     $a = hash_hmac('sha1', 'a'.$expires.'b', $secret);
     $b = hash_hmac('sha1', 'z'.$expires.'y', $secret);
     return pack("h*", $a.$b);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Timing safe string comparison
-function slow_equals($a, $b) {
-    $diff = strlen($a) ^ strlen($b);
-    for($i = 0; $i < strlen($a) && $i < strlen($b); $i++) {
-        $diff |= ord($a[$i]) ^ ord($b[$i]);
+class Aes256 {
+    static function encrypt($data, $key) {
+        $key = mb_substr($key, 0, 32);
+        $iv = mb_substr(mcrypt_create_iv(32, MCRYPT_DEV_URANDOM), 0, 32);
+        $data = mcrypt_encrypt('rijndael-256', $key, $data, 'cbc', $iv);
+        return sprintf('%s|%s', base64_encode($data), base64_encode($iv));
     }
-    return 0 === $diff;
-}
-
-
-function encrypt($data, $key, $algo = 'rijndael-256', $mode = 'cbc', $dev = MCRYPT_DEV_URANDOM) {
-    return sprintf('%s|%s', base64_encode(mcrypt_encrypt(
-        $algo,
-        mb_substr($key, 0, mcrypt_get_key_size($algo, $mode)),
-        $data,
-        $mode,
-        $iv = mb_substr(mcrypt_create_iv(
-            $z = mcrypt_get_iv_size($algo, $mode),
-            $dev
-        ), 0, $z)
-    )), base64_encode($iv));
-}
-
-
-function decrypt($data, $key, $algo = 'rijndael-256', $mode = 'cbc') {
-    list($data, $iv) = array_map('base64_decode', explode('|', $data));
-    return str_replace("\x0", '', mcrypt_decrypt(
-        $algo,
-        mb_substr($key, 0, mcrypt_get_key_size($algo, $mode)),
-        $data,
-        $mode,
-        mb_substr($iv, 0, mcrypt_get_iv_size($algo, $mode))
-    ));
-}
-
-
-if(!function_exists('password_hash')) {
-    function password_hash($password, $rounds = 12) {
-        $rounds = ($rounds < 4 ? 4 : ($rounds > 31 ? 31 : $rounds));
-        $nonce = mcrypt_create_iv(16, MCRYPT_DEV_URANDOM);
-        $nonce = substr(strtr(base64_encode($crypt), '+', '.'), 0, 22);
-        $crypt = crypt($password, sprintf('$2y$%02d$%s', $rounds, $nonce));
-        return (is_string($crypt) && strlen($crypt) >= 60) ? $crypt : false;
-    }
-    function password_verify($password, $hash) {
-        $r = crypt($password, $hash);
-        if(!is_string($r) || strlen($r) != strlen($hash) || strlen($r) < 60) {
-            return false;
-        }
-        for($i = 0, $j = 0; $i < strlen($r); $i++)
-            $j |= (ord($r[$i]) ^ ord($hash[$i]));
-        return $j === 0;
+    static function decrypt($data, $key) {
+        list($data, $iv) = array_map('base64_decode', explode('|', $data));
+        list($key, $iv) = [mb_substr($key, 0, 32), mb_substr($iv, 0, 32)];
+        $data = mcrypt_decrypt('rijndael-256', $key, $data, 'cbc', $iv);
+        return str_replace("\x0", '', $data);
     }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function json_htmlencode($obj) {
     // Encode <, >, ', &, and ", RFC4627 JSON, for embedding in HTML.
-    $flags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT;
+    $flags = JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT;
     return json_encode($obj, $flags);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Similar to PHP's own trim() function, except when using extra
 # characters to trim, it will append those to the default trim
 # characters instead of replacing the defaults with the new one.
 function trim_extra($str, $chars = '') {
-    $chars = chr(32).chr(9).chr(10).chr(13).chr(0).chr(11).$chars;
-    return trim($str, $chars);
+    return trim($str, chr(32).chr(9).chr(10).chr(13).chr(0).chr(11).$chars);
 }
 
-
-# Rev:20100913_0900 - https://github.com/jmrware/LinkifyURL
-function linkify($text, $html = true) {
-    static $url_pattern = '/
-        (\()((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\))|
-        (\[)((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\])|
-        (\{)((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\})|
-        (<|&(?:lt|\#60|\#x3c);)
-        ((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)
-        (>|&(?:gt|\#62|\#x3e);)|((?:^|[^=\s\'"\]])\s*[\'"]?|[^=\s]\s+)
-        (\b(?:ht|f)tps?:\/\/[a-z0-9\-._~!$\'()*+,;=:\/?#[\]@%]+(?:
-        (?!&(?:gt|\#0*62|\#x0*3e);|&(?:amp|apos|quot|\#0*3[49]|\#x0*2[27]);
-        [.!&\',:?;]?(?:[^a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]|$))
-        &[a-z0-9\-._~!$\'()*+,;=:\/?#[\]@%]*)*[a-z0-9\-_~$()*+=\/#[\]@%])
-    /imx';
-    static $section_html_pattern = '%
-        ([^<]+(?:(?!<a\b)<[^<]*)*|(?:(?!<a\b)<[^<]*)+)|
-        (<a\b[^>]*>[^<]*(?:(?!</a\b)<[^<]*)*</a\s*>)
-    %ix';
-    static $url_replace = '$1$4$7$10$13<a href="$2$5$8$11$14">$2$5$8$11$14</a>$3$6$9$12';
-    return ($html)
-        ? preg_replace_callback($section_html_pattern, function($m) {
-              return isset($m[2]) ? $m[2] : linkify($m[1], false);
-          }, preg_replace('/&apos;/', '&#39;', $text));
-        : preg_replace($url_pattern, $url_replace, $text);
-}
-
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # String sanitizer
-function h($str, $entities = false) {
-  $flags = FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH;
-  $str = filter_var($str, FILTER_SANITIZE_STRING, $flags);
-  $str = preg_replace('/\p{C}+/um', '', $str); // strip control chars
-  $flags = ENT_HTML5 | ENT_QUOTES | ENT_SUBSTITUTE | ENT_DISALLOWED;
-  $fn = $ent ? 'htmlentities' : 'htmlspecialchars';
-  return $fn($str, $flags, 'UTF-8', false);
+function sanitize($string, $entities = false) {
+    $encode_flags = ENT_HTML5|ENT_QUOTES|ENT_SUBSTITUTE; #|ENT_DISALLOWED;
+    $string = filter_var($string, FILTER_SANITIZE_STRING);
+    $fn = $entities ? 'htmlentities' : 'htmlspecialchars';
+    return $fn($string, $encode_flags, 'UTF-8', false);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function apply(callable $callable, array $args = array()) {
+    return call_user_func_array($callable, $args);
+}
+function call(callable $callable) {
+    return apply($callable, array_slice(func_get_args(), 1));
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Get the class "basename" of the given object / class.
 function class_basename($class) {
@@ -246,135 +321,507 @@ function class_basename($class) {
     return basename(strtr($class, '\\', '/'));
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function str_linkify($str) {
     return preg_replace('#(https?://\w[-_./\w]+)#i', '<a href="$1">$1</a>', $str);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Regular expression array key search
-function from(array $source, $key = null, $default = null, $limit = true) {
-    $source = (array) $source;
-    if(null === $key) { return $source; }
-    if(array_key_exists($key, $source)) { return $source[$key]; }
-    $keys = array_keys($source);
-    $grep = preg_grep("~^($key)$~i", $keys);
-    $out = array_intersect_key($source, array_flip($grep));
-    return empty($out) ? $default : ($limit ? end($out) : $out);
+# Array utilities
+# Some of these functions are from Laravel <https://github.com/laravel>
+class ArrayUtil
+{
+    # Regular expression array key search
+    static function from(array $arr, $key, $default = null, $one = true) {
+        if (array_key_exists($key, $array)) {
+            return $array[$key];
+        }
+
+        $grep = preg_grep('/^('.preg_quote($key, '/').')$/i', array_keys($array));
+        $ret = array_intersect_key($arr, array_flip($grep));
+
+        return empty($ret) ? $default : ($one ? end($ret) : $ret);
+    }
+
+    static function grepKeys($pattern, array $input, $flags = 0) {
+        $keys = preg_grep($pattern, array_keys($input), $flags);
+        $vals = [];
+
+        foreach ($keys as $k) {
+            $vals[$k] = $input[$k];
+        }
+
+        return $vals;
+    }
+
+    # Check if $array keys are exactly the same as $need
+    static function keysEqual(array $array, array $need, $strict = true) {
+        $have = array_keys($array);
+        ksort($need);
+        ksort($have);
+        return $strict ? ($need === $have) : ($need == $have);
+    }
+
+    # Check if all of the keys from $keys are in the keys of $array
+    static function keysExist(array $array, array $keys) {
+        $keys = array_flip($keys);
+        $diff = array_diff_key($keys, $array);
+        return empty($diff);
+    }
+
+    # Convert XML to an array
+    static function xmlToArray($xml) {
+        return json_decode(json_encode(simplexml_load_string($xml)), true);
+    }
+
+    # Get all of items from $a that don't have keys in $keys
+    static function except(array $array, $keys) {
+        return array_diff_key($array, array_flip((array) $keys));
+    }
+
+    # Get a only items from the array with keys specified in $keys
+    static function only(array $array, $keys) {
+        return array_intersect_key($array, array_flip((array) $keys));
+    }
+
+    static function transpose(array $array) {
+        array_unshift($array, null);
+        return call_user_func_array('array_map', $array);
+    }
+
+    # Get the first element of an array.
+    static function head(array $array) {
+        return reset($array);
+    }
+
+    # Get the last element from an array.
+    static function last(array $array) {
+        return end($array);
+    }
+
+    # Sort the array using the given sort-constant or callback.
+    static function sort(array $array, $method = SORT_REGULAR) {
+        if (is_int($method)) {
+            asort($array, $method);
+        } else {
+            uasort($array, $method);
+        }
+
+        return $array;
+    }
+
+    # Get a value from the array, and remove it.
+    static function pull(array &$array, $key) {
+        $value = static::get($array, $key);
+        static::remove($array, $key);
+        return $value;
+    }
+
+    # Pluck an array of values from an array.
+    static function pluck(array $array, $value, $key = null) {
+        $ret = [];
+
+        foreach ($array as $item) {
+            $itemValue = is_object($item) ? $item->{$value} : $item[$value];
+
+            if (null === $key) {
+                $ret[] = $itemValue;
+            } else {
+                $itemKey = is_object($item) ? $item->{$key} : $item[$key];
+                $ret[$itemKey] = $itemValue;
+            }
+        }
+
+        return $ret;
+    }
+
+    # Set an array item to a given value using "dot" notation.
+    static function set(array &$array, $key, $value) {
+        if (null === $key) {
+            return $array = $value;
+        }
+
+        $keys = explode('.', $key);
+
+        while (sizeof($keys) > 1) {
+            $key = array_shift($keys);
+
+            if (!isset($array[$key]) || !is_array($array[$key])) {
+                $array[$key] = array();
+            }
+
+            $array =& $array[$key];
+        }
+
+        $array[array_shift($keys)] = $value;
+
+        return $array;
+    }
+
+    # Get an item from an array using "dot" notation.
+    static function get(array $array, $key, $default = null) {
+        if (null === $key) {
+            return $array;
+        }
+
+        if (isset($array[$key])) {
+            return $array[$key];
+        }
+
+        foreach (explode('.', $key) as $part) {
+            if (!is_array($array) || !array_key_exists($part, $array)) {
+                return $default;
+            }
+
+            $array = $array[$part];
+        }
+
+        return $array;
+    }
+
+    # Remove an array item from a given array using "dot" notation.
+    static function remove(&$array, $key) {
+        $keys = explode('.', $key);
+
+        while (sizeof($keys) > 1) {
+            $key = array_shift($keys);
+
+            if (!isset($array[$key]) || !is_array($array[$key])) {
+                return;
+            }
+
+            $array =& $array[$key];
+        }
+
+        unset($array[array_shift($keys)]);
+    }
+
+    # Fetch a flattened array of a nested array element.
+    static function fetch($array, $key) {
+        foreach (explode('.', $key) as $part) {
+            $ret = [];
+
+            foreach ($array as $value) {
+                $value = (array) $value;
+                $ret[] = $value[$part];
+            }
+
+            $array = array_values($ret);
+        }
+
+        return array_values($ret);
+    }
+
+    # Flatten a multi-dimensional array into a single level.
+    static function flatten(array $array) {
+        $ret = [];
+
+        array_walk_recursive($array, function ($i) use (&$ret) {
+            $ret[] = $i;
+        });
+
+        return $ret;
+    }
+
+    # Return the first element in an array passing a given truth test.
+    static function first(array $array, callable $callback, $default = null) {
+        foreach ($array as $key => $value) {
+            if ($callback($key, $value)) {
+                return $value;
+            }
+        }
+
+        return $default;
+    }
+
+    # Build a new array using a callback.
+    static function build(array $array, callable $callback) {
+        $ret = [];
+
+        foreach ($array as $key => $value) {
+            list($innerKey, $innerValue) = $callback($key, $value);
+            $ret[$innerKey] = $innerValue;
+        }
+
+        return $ret;
+    }
+
+    # Divide an array into two arrays. One with keys and the other with values.
+    static function divide(array $array) {
+        return [array_keys($array), array_values($array)];
+    }
+
+    # Add an element to an array if it doesn't exist.
+    static function add(array $array, $key, $value) {
+        if (!array_key_exists($key, $array)) {
+            $array[$key] = $value;
+        }
+
+        return $array;
+    }
+
+    # Flatten a multi-dimensional associative array with dots.
+    static function dot(array $array) {
+        $ret = [];
+
+        foreach ($array as $key => $value) {
+            if (is_array($value)) {
+                $ret = array_merge($ret, static::dot($value, $key.'.'));
+            } else {
+                $ret[$key] = $value;
+            }
+        }
+
+        return $ret;
+    }
+
+    # Replace a given value in the string sequentially with an array.
+    static function strReplace($search, array $replace, $subject) {
+        foreach ($replace as $value) {
+            $subject = preg_replace("/$search/", $value, $subject, 1);
+        }
+
+        return $subject;
+    }
+
+    # Replace a given pattern with each value in the array in sequentially.
+    static function gsub($pattern, &$replacements, $subject) {
+        return preg_replace_callback($pattern, function ($m) use (&$replacements) {
+            return array_shift($replacements);
+        }, $subject);
+    }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Check if $array keys are exactly the same as $keys_need
-function array_keys_equal(array $array, array $keys_need, $strict = true) {
-    $keys_have = array_keys($array);
-    ksort($keys_need);
-    ksort($keys_have);
-    return ($strict)
-        ? ($keys_need === $keys_have)
-        : ($keys_need == $keys_have);
+function slug($str, $slug = '-') {
+    if (function_exists('iconv')) {
+        $str = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string);
+    } else {
+        $tstr = htmlentities($str, ENT_QUOTES, 'UTF-8');
+        if (false !== strpos($tstr, '&')) {
+            $r = '/&([a-z]{1,2})(?:acute|caron|cedil|circ|grave|lig|orn|ring|slash|tilde|uml);/i';
+            $str = html_entity_decode(preg_replace($r, '$1', $tstr), ENT_QUOTES, 'UTF-8');
+        }
+    }
+
+    return strtolower(trim(preg_replace('/\W+/i', $slug, $str), $slug));
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Check if all of the keys from $keys are in the keys of $array
-function array_keys_exist(array $array, array $keys) {
-    $keys = array_flip($keys);
-    $diff = array_diff_key($keys, $array);
-    return empty($diff);
+function size_format($bytes, $precision = 2, $format = '%-7.2f %s') {
+    $u = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+    $p = floor((($b = max($bytes, 0)) ? log($b) : 0) / log(1024));
+    $b /= (1 << (10 * ($p = min($p, count($u) - 1))));
+    return sprintf($format, round($b, $precision), $u[$p]);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Convert XML to an array
-function array_from_xml($xml) {
-    $xml = simplexml_load_string($xml);
-    $xml = json_encode($xml);
-    return json_decode($xml, true);
+class Path {
+    static function normalize($path) {
+        $path = strtr($path, '\\', '/');
+        $path = preg_replace('/^[A-Za-z]:/', '', $path);
+        $path = preg_replace("/[\/](?!<:\/)+/", '/', $path);
+        return $path;
+    }
+
+    static function join() {
+        $args = array_filter(func_get_args());
+        foreach ($args as &$arg) {
+            $arg = trim($arg, '/');
+        }
+
+        return trim(static::normalize(join('/', $args)));
+    }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Get all of items from $a that don't have keys in $keys
-function array_except(array $array, array $desired_keys) {
-    return array_diff_key($array, array_flip($desired_keys));
+class CSRF {
+    static function getToken($expires = 600) {
+        session_id() or session_start();
+
+        if (empty($_SESSION['csrf_tokens'])) {
+            $_SESSION['csrf_tokens'] = array();
+        }
+
+        $nonce = hash('sha256', mcrypt_create_iv(32, MCRYPT_DEV_URANDOM));
+        $ip = (string) $_SERVER['REMOTE_ADDR'];
+        $ttl = $expires ? (time() + (int) $expires) : 0;
+        $_SESSION['csrf_tokens'][$nonce] = compact('ip', 'ttl');
+
+        return $nonce;
+    }
+
+    static function validateToken($token) {
+        session_id() or session_start();
+
+        if (!empty($token) && !empty($_SESSION['csrf_tokens'][$token])) {
+            $found = $_SESSION['csrf_tokens'][$token];
+            unset($_SESSION['csrf_tokens'][$token]);
+
+            if (isset($found['ip'], $found['ttl']) &&
+                ($_SERVER['REMOTE_ADDR'] == $found['ip']) &&
+                (0 == $found['ttl'] || time() < $found['ttl']))
+            {
+                return true;
+            }
+        }
+
+        session_regenerate_id();
+        return false;
+    }
 }
 
-
-# Get a only items from the array with keys specified in $keys
-function array_only(array $array, array $desired_keys) {
-    return array_intersect_key(array_flip($desired_keys), $array);
-}
-
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function is_iterable($var) {
-    set_error_handler(function($n, $s, $f, $l) {
+    set_error_handler(function ($n, $s, $f, $l) {
         throw new \ErrorException($s, null, $n, $f, $l);
     });
+
     try {
-        foreach($var as $v) break;
+        foreach ($var as $v) {
+            break;
+        }
     } catch(\ErrorException $e) {
         restore_error_handler();
         return false;
     }
+
     restore_error_handler();
     return true;
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-function array_transpose(array $array) {
-    array_unshift($array, null);
-    return call_user_func_array('array_map', $array);
+# Shortcut define or get constant if defined
+function def($name, $value = null) {
+    if (null === $value) {
+        return defined($name) ? constant($name) : null;
+    }
+
+    defined($k) or define($k, $v);
+    return constant($k);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-function log_write($message, $severity = LOG_DEBUG, $file = ) {
-    if(!filter_var(ini_get('log_errors', FILTER_VALIDATE_BOOLEAN))) return;
-    $file = ini_get('error_log') ?: 'php://stderr';
+function log_write($message, $severity = LOG_DEBUG) {
+    if (!filter_var(ini_get('log_errors', FILTER_VALIDATE_BOOLEAN))) {
+        return;
+    }
+
+    $inilog = ini_get('error_log');
+    $file = (is_string($inilog) && !empty($inilog)) ? $inilog : 'php://stderr';
     $severity = addcslashes(strval($severity), '"');
     $message = addcslashes(strval($message), '"')."\n";
     $line = sprintf('"%s", "%s", "%s"', time(), $severity, $message);
-    return error_log($line, $file ? 3 : 0, $file);
+
+    return error_log($line, 3, $file);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function get_request_method($allow_override = true) {
-    if($allow_override) {
-        $post = array_change_key_case($_POST, CASE_LOWER);
-        if(isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
+    if ($allow_override) {
+        if (isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
             $method = $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'];
-        } elseif(isset($post['_method'])) {
-            $method = $post['_method'];
+        } elseif (isset($_POST['_method'])) {
+            $method = $_POST['_method'];
+        } elseif (isset($_POST['_METHOD'])) {
+            $method = $_POST['_METHOD'];
         }
     }
-    if(empty($method)) {
-        $method = isset($_SERVER['REQUEST_METHOD'])
-            ? $_SERVER['REQUEST_METHOD']
-            : 'GET';
+
+    if (empty($method)) {
+        $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
     }
-    return strtolower($method);
+
+    return strtoupper($method);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-function is_ascii($str) {
-    return !preg_match('/[^\x00-\x7F]/S', $str);
+function is_ascii($string) {
+    return !preg_match('/[^\x00-\x7F]/S', $string);
 }
 
-function url($url, $dns = false) {
-    return is_string(filter_var($url, FILTER_VALIDATE_URL))
-        && (!$dns || (false !== checkdnsrr($url, 'ANY')));
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Validate URL with optional DNS record check
+function is_url($url, $check_dns = false) {
+    $valid = is_string(filter_var($url, FILTER_VALIDATE_URL));
+
+    if ($check_dns) {
+        $valid = $valid && false !== checkdnsrr($url, 'ANY');
+    }
+
+    return $valid;
 }
 
-function is_email($str, $mx = false) {
-    return is_string(filter_var($str, FILTER_VALIDATE_EMAIL))
-        && (!$mx || getmxrr(ltrim(strrchr($str, '@'), '@'), $x));
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Validate email with optional MX Record check
+function is_email($email, $check_mx = false) {
+    $valid = is_string(filter_var($email, FILTER_VALIDATE_EMAIL));
+
+    if ($check_mx) {
+        $valid = $valid && getmxrr(ltrim(strrchr($email, '@'), '@'), $x);
+    }
+
+    return $valid;
 }
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function session_started() {
-    $active = [PHP_SESSION_ACTIVE, PHP_SESSION_DISABLED];
-    return in_array(session_status(), $active);
+    return PHP_SESSION_ACTIVE === session_status();
 }
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function is_https() {
     return filter_var(getenv('HTTPS'), FILTER_VALIDATE_BOOLEAN);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 function get_base_uri()  {
     $request_uri = getenv('REQUEST_URI') ?: getenv('PHP_SELF');
@@ -382,203 +829,47 @@ function get_base_uri()  {
     $base_uri = strpos($request_uri, $script_name) === 0
         ? $script_name
         : strtr(dirname($script_name), '\\', '/');
+
     return rtrim($base_uri, '/');
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Simple key-value storage/cache
-function c($key = null, $value = null) {
-    static $_cache = [];
-    $argc = func_num_args();
-    if (0 === $argc) { # get all
-        return $_cache;
-    } elseif (is_array($key)) { # Set array of [key => val]
-        foreach ($key as $k => $v) c($k, $v);
-    } elseif (2 === $argc) { # Set key => val, or unset - c(false, key)
-        if (false === $key) unset($_cache[$value]);
-        else return $_cache[$key] = $value;
-    } elseif (1 === $argc && $key) { # Get key if set
-        return array_key_exists($key, $_cache) ? $_cache[$key] : null;
-    }
-}
+# PHP (5.4+) only allows *one* callback to be registered, which is executed
+# before the headers are sent. This allows setting an unlimited number.
+function header_callback(callable $callback = null, $prepend = false) {
+    static $callbacks = array();
+    static $registered = false;
 
-
-# Replacement for PHP 5.4 header_register_callback until it's functional.
-function header_callback(callable $callback = null, $priority = 0) {
-    static $callbacks;
-    if (null === $callbacks) {
-        header_register_callback(__FUNCTION__);
-        $callbacks = [];
-    }
+    # Dispatch the callbacks
     if (0 === func_num_args()) {
-        ksort($callbacks);
-        array_map('call_user_func', $callbacks);
+        if (headers_sent()) {
+            throw new \UnexpectedValueException("Headers have already been sent?!");
+        }
+
+        foreach ($callbacks as $callback) {
+            $callback();
+        }
+
         return;
-    } elseif ($priority) {
-        $callbacks[(int) $priority] = $callback;
+    }
+
+    if ($prepend) {
+        array_unshift($callbacks, $callback);
     } else {
         $callbacks[] = $callback;
     }
-}
 
-# Add a header string without writing an anonymous function to handle it:
-function header_add($string) {
-    $args = func_get_args();
-    header_callback(function() use ($args) {
-        header(call_user_func_array('sprintf', $args));
-    });
-}
-
-
-# transform markdown to html
-# regex from https://github.com/phuu/lowcarb/blob/master/lowcarb/minidown.php
-if (!function_exists('markdown')) {
-function markdown($str) {
-    $md = [
-        "/\r?\n/" => "\n",
-        "/>/" => "&gt;",
-        "/\n{4,}/" => "\n\n\n",
-        "/\n+(&gt;\s{1}(.+))\n{2,}/i" => "<blockquote>$2</blockquote>\n",
-        "/#+\s{1}(.+)\n+/i" => "<h3>$1</h3>\n",
-        "/\((.+?)\)\[(\S+?)\]/i" => "<a href=\"$2\">$1</a>",
-        "/\!\[(.+?)\]\((.+?)\)/i" => "<img src=\"$1\" alt=\"$2\">",
-        "/\n{2,}(-\s{1}(.+)\n{1}.+)/im" => "\n<ul>$1",
-        "/(-\s{1}(.+)\n)\n+/im" => "$1</ul>\n",
-        "/\n?(-\s{1}(.+))\n?/i" => "<li>$2</li>",
-        "/^(.+)\n+/i" => "<p>$1</p>\n",
-        "/\n+(.+)[\n+\Z]?/im" => "<p>$1</p>\n",
-    ];
-    return preg_replace(
-        array_keys($md),
-        array_values($md),
-        stripslashes($str)."\n\n"
-    );
-}
-}
-
-
-function handlebar($path, $vars = []) {
-    return str_replace(
-        array_map(function ($v) {
-    	    return '{{'.$v.'}}';
-    	}, array_keys($vars)),
-    	array_values($vars),
-    	file_get_contents($path)
-	);
-}
-
-
-# MicroTpl
-# http://github.com/unu/microtpl
-class MicroTpl {
-    static function parse($tpl) {
-        return preg_replace([
-            '_{\@([^}]+)}_', # {@list} list array
-            '_{\?([^}]+)}_', # {?bool} show on true
-            '_{\!([^}]+)}_', # {!bool} show on false
-            '_{\/([^}]+)}_', # {/list} closing mark
-            '_{\&([^}]+)}_', # {&var} unescaped echo
-            '_{([a-zA-Z0-9]+)}_', # {var} escaped echo
-            '_{([a-zA-Z0-9]+=[^}]+)}_', # {var='value'} assign variable
-            '_{-?([^ }][^}]*)}_', # {php code} php code
-        ], [
-            '<?php $_save_\1=get_defined_vars();'
-            . 'foreach((isset($\1)&&is_array($\1)?$\1:array())as$_item){ '
-            . 'if(is_array($_item))extract($_item)?>',
-            '<?php if(isset($\1)&&!!$\1){ ?>',
-            '<?php if(!isset($\1)||!$\1){ ?>',
-            '<?php }if(isset($_save_\1)&&is_array($_save_\1))extract($_save_\1)?>',
-            '<?php echo isset($\1)?$\1:null?>',
-            '<?php echo isset($\1)?htmlspecialchars(\$\1,ENT_QUOTES):null?>',
-            '<?php $this->\1?>',
-            '<?php \1?>',
-        ], $tpl);
-    }
-    function render($_tpl, $_return = false) {
-        if ($_return) {
-            ob_start();
-        }
-        extract((array) $this);
-        eval('?>'.self::parse($_tpl));
-        if ($_return) {
-            return ob_get_clean();
-        }
-    }
-    function renderFile($file, $return = false) {
-        return $this->render(file_get_contents($file), $return);
-    }
-}
-/*
-$tpl = new MicroTpl();
-$tpl->title = 'MicroTpl';
-$tpl->messages = [
-    ['message' => 'Hello, Earth'],
-    ['message' => 'We confiscates this planet.'],
-];
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>{title}</title>
-  </head>
-  <body>
-    <h1>{title}</h1>
-    {@messages}
-      <p>{message}</p>
-    {/messages}
-  </body>
-</html>
-*/
-
-
-# From https://github.com/Respect/Loader
-# I think it's clever.
-function Respect_Load($className) {
-    $fileParts = explode('\\', ltrim($className, '\\'));
-    if (false !== strpos(end($fileParts), '_')) {
-        array_splice($fileParts, -1, 1, explode('_', current($fileParts)));
-    }
-    $fileName = implode(DIRECTORY_SEPARATOR, $fileParts).'.php';
-    if (stream_resolve_include_path($fileName)) {
-        require $filename;
+    if (!$registered) {
+        header_register_callback('header_callback');
     }
 }
 
-
-/**
- * Check if all specified keys exist in the given array.
- *
- * @param array $keys The keys to search for
- * @param array $array The array to search in
- * @param boolean $strict If true, keys must be non-empty to "exist".
- * @return boolean
- */
-function array_keys_exist(array $keys, array $array, $strict = false) {
-    foreach ($keys as $key) {
-        if (!array_key_exists($key, $array)
-        || ($strict && empty($array[$key]))) {
-            return false;
-        }
-    }
-    return true;
-}
-
-
-# I need this.
-function ifsetor(&$var, $default = null) {
-    return isset($var) ? $var : $default;
-}
-
-# ifsetor alias
-function v(&$var, $default = null) {
-    return isset($var) ? $var : $default;
-}
-
-# Help to escape user input.
-function h($str, $flags = null, $charset = 'UTF-8', $double = false) {
-    $flags = $flags ?: (ENT_HTML5 | ENT_QUOTES);
-    return htmlspecialchars((string) $str, $flags, $charset, $double);
-}
-
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 /**
  * This takes a string and trims off start and ending pairs (brackets)
@@ -613,58 +904,84 @@ function trim_bounds($str) {
     return $str;
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-# Mini little stasher for vars.
-function stash($k, $v = null) {
-    session_id() or session_start();
-    $_ = '#stash#';
-    if (empty($_SESSION[$_])) {
-        $_SESSION[$_] = [];
-    }
-    if (func_num_args() === 1) {
-        return isset($_SESSION[$_][$k]) ? $_SESSION[$_][$k] : null;
-    }
-    return $_SESSION[$_][$k] = $v;
+function cycle() {
+    static $i;
+    return func_get_args()[($i++%func_num_args())];
+}
+# for ($i = 0; $i < 10; $i++) var_dump(cycle('1', '2', '3'));
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Replace all of {{these}} with $vars['these']
+function brace($path, array $vars = []) {
+    return str_replace(
+        array_map(function ($v) {
+            return sprintf('{{%s}}', $v);
+        }, array_keys($vars)),
+        array_values($vars),
+        file_get_contents(realpath($path))
+    );
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-/**
- * Crappy handler of flash messages.
- */
-function flash($key, $msg = null, $now = false) {
-    static $x = [], $_ = '$flash$';
-    session_id() or session_start();
-    $c = isset($_SESSION[$_]) ? json_decode($_SESSION[$_], true) : [];
-    if (null === $msg) {
-        if (isset($c[$key])) {
-            $x[$key] = $c[$key];
-            unset($c[$key]);
-            $_SESSION[$_] = json_encode($c);
-        }
-        return isset($x[$key]) ? $x[$key] : null;
-    }
-    if (!$now) {
-        $c[$key] = $msg;
-        $_SESSION[$_] = json_encode($c);
-    }
-    return ($x[$key] = $msg);
+# Finds comments... in a file.
+function find_comments($file) {
+    $contents = file_get_contents($file);
+    $regex = '/\/\*(?<!(\*\/))(.*)(?!(\*\/))\/\*/msSU';
+    return preg_match_all($regex, $contents, $matches)
+        ? array_map(function ($comment) {
+            return join('', array_filter(array_map(function ($line) {
+                return ltrim($line, "\r\n\t\0 */");
+            }, explode("\n", $comment))));
+        }, $matches[2])
+        : [];
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
-// Turns an array of constructor args into
-// an array of objects of the called class.
-trait Collectable
-{
-    public static function collect($posts)
-    {
-        $static = get_called_class();
-        return array_map(function ($post) use ($static) {
-            return new $static($post);
-        }, $posts);
-    }
+function noise($len = 32) {
+    return substr(str_shuffle(str_repeat(join('', range('!','~')), 3)), 0, $len);
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
+function rss($title, $link, array $entries) {
+    while (ob_get_level()) ob_end_clean();
+    header("Content-Type: application/rss+xml;charset=UTF-8")
+    print '<?xml version="1.0" encoding="UTF-8"?>';
+    print '<rss version="2.0">';
+    print '<channel>';
+    print '<title>'.$title.'</title>';
+    print '<link>'.$link.'</link>';
+    print '<description>'.$title.' [RSS]</description>';
+    foreach ($items as $item) {
+        print '<item>';
+        print '<title>'.$item['title'].'</title>';
+        print '<link>'.$item['link'].'</link>';
+        print '<pubDate>'.gmdate(DATE_RSS, $item['time']).' GMT</pubDate>';
+        print '</item>';
+    }
+    print '</channel>';
+    print '</rss>';
+    exit;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 # Determine if an IP is in a subnet
 # http://stackoverflow.com/questions/594112
@@ -684,3 +1001,239 @@ function ip_cidr_match($ip, $other) {
     }
 }
 
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function http_date($dt = 0) {
+    $time = ($dt && is_int($dt)) ? $dt : time();
+    return gmdate("D, d M Y H:i:s", $time).' GMT';
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function copy_directory_structure($src, $dest) {
+    // This assumes an empty directory.
+    $dh = opendir($src);
+    $ds = DIRECTORY_SEPARATOR;
+
+    while ($d = readdir($dh)) {
+        if (is_dir($src.$ds.$d) && $d != '.' && $d != '..') {
+            mkdir($dest.$ds.$d);
+            copy_directory_structure($src.$ds.$d, $dest.$ds.$d);
+        }
+    }
+
+    return closedir($dh);
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+class UUID {
+    static function validate($uuid) {
+        $pattern = "/^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}\}?$/";
+        return 1 === preg_match($pattern, strtolower($uuid));
+    }
+    static function generate() {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff)
+        );
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+class Bcrypt {
+    static $base64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    static $bcryptchars = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+    static function hash($password, $cost = 14) {
+        if (!is_string($password) || !is_int($cost) || $cost < 4 || $cost > 31) {
+            throw new \InvalidArgumentException();
+        }
+
+        $salt = base64_encode(mcrypt_create_iv(16, MCRYPT_DEV_URANDOM));
+        $salt = rtrim($salt, '=');
+        $salt = strtr($salt, self::$base64chars, self::$bcryptchars);
+        $salt = mb_substr($salt, 0, 22, '8bit');
+        $hash = sprintf("$2y$%02d$%s", $cost, $salt);
+        $hash = crypt($password, $hash);
+
+        return (is_string($hash) && 60 === mb_strlen($hash, '8bit')) ? $hash : false;
+    }
+
+    static function verify($password, $hash) {
+        $crypt = crypt($password, $hash);
+        $hl = mb_strlen($hash, '8bit');
+        $cl = mb_strlen($crypt, '8bit');
+
+        if (!is_string($crypt) || $cl !== $hl || $cl <= 13) {
+            return false;
+        }
+
+        $status = 0;
+        for ($i = 0; $i < $cl; $i++) {
+            $status |= (ord($crypt[$i]) ^ ord($hash[$i]));
+        }
+
+        return 0 === $status;
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function slow_equals($known_value, $user_input) {
+    /* Prevent issues if string length is 0. */
+    $known_value .= chr(0);
+    $user_input .= chr(0);
+    $klen = strlen($known_value);
+    $ulen = strlen($user_input);
+    $result = $klen - $ulen;
+
+    for ($i = 0; $i < $ulen; $i++) {
+        $result |= (ord($known_value[$i % $klen]) ^ ord($user_input[$i]));
+    }
+
+    return $result === 0;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# ob_start('ob_etag_handler')
+function ob_etag_handler($content, $bits) {
+    static $buffer = '', $request_etag;
+
+    if (!$request_etag && isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
+        $request_etag = strtolower(trim($_SERVER['HTTP_IF_NONE_MATCH'], "\"'"));
+    }
+
+    if (!($bits & PHP_OUTPUT_HANDLER_END)) {
+        $buffer .= $content;
+        return '';
+    }
+
+    $local = $buffer.$content;
+    $buffer = '';
+    $etag = md5($local);
+
+    if ($etag === $request_etag) {
+        header('HTTP/1.1 304 Not Modified', true, 304);
+        return '';
+    }
+
+    header(sprintf('ETag: "%s"', $etag));
+    return $local;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function glob_recursive($pattern, $flags = 0) {
+    $files = glob($pattern, $flags);
+    foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR | GLOB_NOSORT) as $dir) {
+        $files = array_merge(
+            $files,
+            glob_recursive($dir.'/'.basename($pattern), $flags)
+        );
+    }
+    return $files;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+// Shim for latest PHP JSON constants/errors
+// https://github.com/php/php-src/blob/master/ext/json/JSON_parser.h
+// https://github.com/php/php-src/blob/master/ext/json/json.c
+defined("JSON_ERROR_NONE") or define("JSON_ERROR_NONE", 0);
+defined("JSON_ERROR_DEPTH") or define("JSON_ERROR_DEPTH", 1);
+defined("JSON_ERROR_STATE_MISMATCH") or define("JSON_ERROR_STATE_MISMATCH", 2);
+defined("JSON_ERROR_CTRL_CHAR") or define("JSON_ERROR_CTRL_CHAR", 3);
+defined("JSON_ERROR_SYNTAX") or define("JSON_ERROR_SYNTAX", 4);
+defined("JSON_ERROR_UTF8") or define("JSON_ERROR_UTF8", 5);
+defined("JSON_ERROR_RECURSION") or define("JSON_ERROR_RECURSION", 6);
+defined("JSON_ERROR_INF_OR_NAN") or define("JSON_ERROR_INF_OR_NAN", 7);
+defined("JSON_ERROR_UNSUPPORTED_TYPE") or define("JSON_ERROR_UNSUPPORTED_TYPE", 8);
+if (!function_exists("json_last_error_msg")) {
+    function json_last_error_msg() {
+        switch (json_last_error()) {
+            case JSON_ERROR_NONE:
+                return "No error";
+            case JSON_ERROR_DEPTH:
+                return "Maximum stack depth exceeded";
+            case JSON_ERROR_STATE_MISMATCH:
+                return "State mismatch (invalid or malformed JSON)";
+            case JSON_ERROR_CTRL_CHAR:
+                return "Control character error, possibly incorrectly encoded";
+            case JSON_ERROR_SYNTAX:
+                return "Syntax error";
+            case JSON_ERROR_UTF8:
+                return "Malformed UTF-8 characters, possibly incorrectly encoded";
+            case JSON_ERROR_RECURSION:
+                return "Recursion detected";
+            case JSON_ERROR_INF_OR_NAN:
+                return "Inf and NaN cannot be JSON encoded";
+            case JSON_ERROR_UNSUPPORTED_TYPE:
+                return "Type is not supported";
+            default:
+                return "Unknown error";
+        }
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function json_safe_encode($obj, $callback = null) {
+    $flags = JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT;
+    $encoded = json_encode($obj, $flags);
+
+    if (JSON_ERROR_NONE !== ($jle = json_last_error())) {
+        throw new \InvalidArgumentException(json_last_error_msg());
+    }
+
+    if (null !== $callback) {
+        // http://www.geekality.net/2011/08/03/valid-javascript-identifier/
+        $pattern = '/^[$_\p{L}][$_\p{L}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\x{200C}\x{200D}]*+$/u';
+        $parts = explode('.', $callback);
+
+        foreach ($parts as $part) {
+            if (!preg_match($pattern, $part)) {
+                throw new \InvalidArgumentException("Invalid callback name.");
+            }
+        }
+
+        $encoded = sprintf("%s(%s);", $callback, $encoded);
+    }
+
+    return $encoded;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
