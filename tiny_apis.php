@@ -38,3 +38,13 @@ function github_markdown($text, $gfm = true, $context = null) {
     ]]);
     return file_get_contents($uri, null, $c);
 }
+
+# pinboard.in
+function pinboard_api_get($method, $auth_token, array $params = array()) {
+    $ctx = stream_context_create(array("HTTP" => array("method" => "GET")));
+    $params["auth_token"] = urlencode($auth_token);
+    $params["format"] = "json";
+    $url = "https://api.pinboard.in/v1/{$method}";
+    $url .= "?".http_build_query($params, "", "&", PHP_QUERY_RFC3986);
+    return file_get_contents($url, null, $ctx);
+}
