@@ -46,5 +46,5 @@ function pinboard_api_get($method, $auth_token, array $params = array()) {
     $params["format"] = "json";
     $url = "https://api.pinboard.in/v1/{$method}";
     $url .= "?".http_build_query($params, "", "&", PHP_QUERY_RFC3986);
-    return ($data = file_get_contents($url, null, $ctx)) ? json_decode($data) : null;
+    return ($data = file_get_contents($url, null, $ctx)) ? json_decode($data, true) : null;
 }
