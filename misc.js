@@ -174,6 +174,22 @@ function regexEscape(str) {
 
 
 
+// break 'www.example.com' into ["com", "example.com", "www.example.com"]
+function subdomains(hostame) {
+    (hostname || location.hostname).split(/\./).map(function (e, i, arr) {
+        return arr.slice(i).join('.');
+    }).reverse();
+}
+
+
+
+// integer or integer string > 0
+function isNatural(n) {
+    return isFinite(n = Number(n)) && /^[0-9]+$/.test(n) && n > 0;
+}
+
+
+
 String.prototype.startsWith = String.prototype.startsWith || function (prefix) {
     return this.slice(0, prefix.length) === prefix;
 };
