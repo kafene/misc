@@ -204,32 +204,21 @@ String.prototype.endsWith = String.prototype.endsWith || function (suffix) {
 
 // polyfill for Element.matches
 (function (obj) {
-    var matches;
-
-    if (obj.matches) {
-        matches = obj.matches;
-    } else if (obj.matchesSelector) {
-        matches = obj.matchesSelector;
-    } else if (obj.mozMatchesSelector) {
-        matches = obj.mozMatchesSelector;
-    } else if (obj.msMatchesSelector) {
-        matches = obj.msMatchesSelector;
-    } else if (obj.oMatchesSelector) {
-        matches = obj.oMatchesSelector;
-    } else if (obj.webkitMatchesSelector) {
-        matches = obj.webkitMatchesSelector;
-    } else {
-        matches = function (selector) {
-            var node = this;
-            var parent = node.parentNode || node.document;
-            var nodes = parent.querySelectorAll(selector);
-            var i = -1;
-            while (nodes[++i] && nodes[i] != node);
+    var matches = (
+        obj.matches ||
+        obj.matchesSelector ||
+        obj.mozMatchesSelector ||
+        obj.msMatchesSelector ||
+        obj.oMatchesSelector ||
+        obj.webkitMatchesSelector ||
+        function (selector) {
+            var nodes = (this.parentNode || this.document).querySelectorAll(selector), i = -1;
+            while (nodes[++i] && nodes[i] !== this);
             return !!nodes[i];
-        };
-    }
-
-    obj.matches = obj.matchesSelector = matches;
+        }
+    );
+    if (!obj.matches) { obj.matches = matches; }
+    if (!obj.matchesSelector) { obj.matchesSelector = matches; }
 })(window.Element.prototype);
 
 
