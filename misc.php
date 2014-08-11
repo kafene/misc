@@ -4,24 +4,25 @@
 // #############################################################################
 // #############################################################################
 
-function event($name, $value = null) {
+# event('foo.bar', null, function () { echo 'foo.bar 1'; }); // add
+# event('foo.bar', null, function () { echo 'foo.bar 2'; }); // add
+# event('foo.bar'); // emit
+# event('foo.bar', null, false); // remove
+function event($event, array $args = null, $callback = null) {
     static $events = [];
 
-    if (false === $name) {
-        unset($events[$value]);
-        return;
-    }
-
-    $name = strtolower($name);
-
-    if ($name && is_callable($value)) {
-        return $events[$name][] = $value;
-    } elseif ($name && isset($events[$name])) {
-        foreach($events[$name] as $callback) {
-            $callback($value);
+    if ($callback !== null) {
+        if ($callback) {
+            $events[$event][] = $callback;
+        } else {
+            unset($events[$event]);
+        }
+    } elseif (isset($events[$event])) {
+        foreach ($events[$event] as $fn) {
+            $args = call_user_func_array($fn, $args);
         }
 
-        return $value;
+        return $args;
     }
 }
 
@@ -93,22 +94,30 @@ function enable_cors($enable) {
 # Find files recursively in a given directory
 # Filtered by a regular expression pattern
 function rscandir($dir, $filter_pattern = '/.*/') {
-    if (!is_dir($dir = realpath($dir))) {
+    $dir = realpath($dir);
+
+    if (!is_dir($dir)) {
         return [];
     }
 
-    $df = \FilesystemIterator::KEY_AS_PATHNAME
-        | \FilesystemIterator::CURRENT_AS_FILEINFO
-        | \FilesystemIterator::SKIP_DOTS
-        | \FilesystemIterator::UNIX_PATHS;
-        #| \FilesystemIterator::FOLLOW_SYMLINKS;
-    $rf = \RecursiveIteratorIterator::SELF_FIRST
-        | \RecursiveIteratorIterator::CATCH_GET_CHILD;
-    $rd = new \RecursiveDirectoryIterator($dir, $df);
-    $it = new \RecursiveIteratorIterator($rd, $rf);
-    $rx = new \RegexIterator($it, $filter_pattern);
+    $directoryIteratorFlags = (
+        \FilesystemIterator::KEY_AS_PATHNAME |
+        \FilesystemIterator::CURRENT_AS_FILEINFO |
+        \FilesystemIterator::SKIP_DOTS |
+        \FilesystemIterator::UNIX_PATHS
+        #| \FilesystemIterator::FOLLOW_SYMLINKS
+    );
 
-    $found = iterator_to_array($rx);
+    $recursiveIteratorFlags = (
+        \RecursiveIteratorIterator::SELF_FIRST |
+        \RecursiveIteratorIterator::CATCH_GET_CHILD
+    );
+
+    $it = new \RecursiveDirectoryIterator($dir, $directoryIteratorFlags);
+    $it = new \RecursiveIteratorIterator($it, $recursiveIteratorFlags);
+    $it = new \RegexIterator($it, $filter_pattern);
+
+    $found = iterator_to_array($it);
     $files = array_filter(array_keys($found), 'is_file');
     $files = array_intersect_key($found, array_flip($files));
 
@@ -161,20 +170,27 @@ function file_permissions($file) {
 // #############################################################################
 // #############################################################################
 
-# PHP lacks a str_putcsv function despite having str_getcsv
-# and fgetcsv/fputcsv. This uses an in-memory file handle and
-# fputcsv to simulate str_putcsv.
-if (!function_exists('str_putcsv')) {
-    function str_putcsv(array $fields, $delimiter = ',', $enclosure = '"') {
-        $fp = new \SplFileObject("php://memory", "r+");
-        $csv = "";
-        $fp->fputcsv($fields, $delimeter, $enclosure);
-        $fp->fseek(0);
-        while (!$fp->eof() && ($line = $fp->getCurrentLine())) {
-            $csv .= trim($line).PHP_EOL;
-        }
-        return trim($csv);
-    }
+/**
+ * From <https://gist.github.com/johanmeiring/2894568>
+ */
+function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
+    // Open a memory "file" for read/write
+    $fp = fopen('php://temp', 'r+');
+
+    // write the $input array to the "file"
+    fputcsv($fp, $input, $delimiter, $enclosure);
+
+    // rewind the "file" so we can read what we just wrote
+    rewind($fp);
+
+    // read the entire line into a variable
+    $data = fread($fp, 1048576);
+
+    // close the "file"
+    fclose($fp);
+
+    // return the $data, with the trailing eol removed.
+    return rtrim($data, "\n");
 }
 
 // #############################################################################
@@ -252,25 +268,6 @@ function create_iv($expires, $secret) {
 // #############################################################################
 // #############################################################################
 
-class Aes256 {
-    static function encrypt($data, $key) {
-        $key = mb_substr($key, 0, 32);
-        $iv = mb_substr(mcrypt_create_iv(32, MCRYPT_DEV_URANDOM), 0, 32);
-        $data = mcrypt_encrypt('rijndael-256', $key, $data, 'cbc', $iv);
-        return sprintf('%s|%s', base64_encode($data), base64_encode($iv));
-    }
-    static function decrypt($data, $key) {
-        list($data, $iv) = array_map('base64_decode', explode('|', $data));
-        list($key, $iv) = [mb_substr($key, 0, 32), mb_substr($iv, 0, 32)];
-        $data = mcrypt_decrypt('rijndael-256', $key, $data, 'cbc', $iv);
-        return str_replace("\x0", '', $data);
-    }
-}
-
-// #############################################################################
-// #############################################################################
-// #############################################################################
-
 function json_htmlencode($obj) {
     // Encode <, >, ', &, and ", RFC4627 JSON, for embedding in HTML.
     $flags = JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT;
@@ -284,8 +281,8 @@ function json_htmlencode($obj) {
 # Similar to PHP's own trim() function, except when using extra
 # characters to trim, it will append those to the default trim
 # characters instead of replacing the defaults with the new one.
-function trim_extra($str, $chars = '') {
-    return trim($str, chr(32).chr(9).chr(10).chr(13).chr(0).chr(11).$chars);
+function trim_extra($str, $charList = '') {
+    return trim($str, " \t\n\r\0\x0B".$charList);
 }
 
 // #############################################################################
@@ -304,11 +301,12 @@ function sanitize($string, $entities = false) {
 // #############################################################################
 // #############################################################################
 
-function apply(callable $callable, array $args = array()) {
-    return call_user_func_array($callable, $args);
+function apply(callable $fn, array &$args = []) {
+    return call_user_func_array($fn, $args);
 }
-function call(callable $callable) {
-    return apply($callable, array_slice(func_get_args(), 1));
+
+function call(callable $fn) {
+    return call_user_func_array($fn, array_slice(func_get_args(), 1));
 }
 
 // #############################################################################
@@ -318,7 +316,7 @@ function call(callable $callable) {
 # Get the class "basename" of the given object / class.
 function class_basename($class) {
     $class = is_object($class) ? get_class($class) : $class;
-    return basename(strtr($class, '\\', '/'));
+    return basename(str_replace('\\', '/', $class));
 }
 
 // #############################################################################
@@ -377,46 +375,6 @@ class Path {
         }
 
         return trim(static::normalize(join('/', $args)));
-    }
-}
-
-// #############################################################################
-// #############################################################################
-// #############################################################################
-
-class CSRF {
-    static function getToken($expires = 600) {
-        session_id() or session_start();
-
-        if (empty($_SESSION['csrf_tokens'])) {
-            $_SESSION['csrf_tokens'] = array();
-        }
-
-        $nonce = hash('sha256', mcrypt_create_iv(32, MCRYPT_DEV_URANDOM));
-        $ip = (string) $_SERVER['REMOTE_ADDR'];
-        $ttl = $expires ? (time() + (int) $expires) : 0;
-        $_SESSION['csrf_tokens'][$nonce] = compact('ip', 'ttl');
-
-        return $nonce;
-    }
-
-    static function validateToken($token) {
-        session_id() or session_start();
-
-        if (!empty($token) && !empty($_SESSION['csrf_tokens'][$token])) {
-            $found = $_SESSION['csrf_tokens'][$token];
-            unset($_SESSION['csrf_tokens'][$token]);
-
-            if (isset($found['ip'], $found['ttl']) &&
-                ($_SERVER['REMOTE_ADDR'] == $found['ip']) &&
-                (0 == $found['ttl'] || time() < $found['ttl']))
-            {
-                return true;
-            }
-        }
-
-        session_regenerate_id();
-        return false;
     }
 }
 
@@ -716,21 +674,23 @@ function rss($title, $link, array $entries) {
 
 # Determine if an IP is in a subnet
 # http://stackoverflow.com/questions/594112
-# E.g. ip_cidr_match('65.40.32.4', '65.40.0.0/64') == true
-function ip_cidr_match($ip, $other) {
-    $ip = (string) $ip;
-    $other = (string) $other;
-    if (false !== strpos($other, '/')) {
-        list($subnet, $mask) = explode('/', $other);
-        $ip = ip2long($ip);
-        $subnet = ip2long($subnet);
-        $mask = -1 << (32 - $bits);
-        $subnet &= $mask;
-        return ($ip & $mask) == $subnet;
-    } else {
-        return $ip == $other;
-    }
+function ip_cidr_match($ip, $range) {
+    list ($subnet, $bits) = explode('/', $range);
+    $ip = ip2long($ip);
+    $subnet = ip2long($subnet);
+    $mask = (-1 << (32 - $bits)) & 4294967295;
+    $subnet &= $mask;
+    return ($ip & $mask) == $subnet;
 }
+/*
+var_dump(
+    ip_cidr_match('65.40.32.4', '65.40.0.0/64'),
+    ip_cidr_match("1.2.3.4", "0.0.0.0/0"),
+    ip_cidr_match("127.0.0.1", "127.0.0.1/32"),
+    ip_cidr_match("127.0.0.1", "127.0.0.2/32"),
+    ip_cidr_match('32.18.96.4', '0.0.0.0/0')
+);
+*/
 
 // #############################################################################
 // #############################################################################
@@ -991,6 +951,381 @@ function minidown($string) {
 
     return $string;
 }
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function filter_date($date, $default = null) {
+    static $re = '/^((?:19|20)\d\d)-?(0[1-9]|1[012])-?(0[1-9]|[12][0-9]|3[01])$/';
+    $i = filter_var($date, FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => $re]]);
+    return (false === $i) ? $default : $i;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Create a random 32 character MD5 token
+function token() {
+    return md5(str_shuffle(chr(mt_rand(32, 126)).uniqid().microtime(true)));
+}
+
+function random_str($length = 16) {
+    $pool = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return substr(str_shuffle(str_repeat($pool, 5)), 0, $length);
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Determine if a given string ends with a given value.
+function str_ends_with($haystack, $needle) {
+    return $needle == substr($haystack, strlen($haystack) - strlen($needle));
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function strtol($str) {
+    return is_long($str) ? $str : intval(preg_replace('/\D/', '', $str));
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+// buffer functions that may echo vs returning output,
+// return echoed data if any, otherwise returned data.
+function buffer(callable $callback) {
+    ob_start();
+    $result = call_user_func_array($callback, array_slice(func_get_args(), 1));
+    $buffer = trim(ob_get_clean());
+    return is_null($result) ? ('' === $buffer ? null : $buffer) : $result;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+/**
+ * RC4 symmetric cipher encryption/decryption
+ * From <https://gist.github.com/farhadi/2185197>
+ *
+ * @license Public Domain
+ * @param string key - secret key for encryption/decryption
+ * @param string str - string to be encrypted/decrypted
+ * @return string
+ */
+function rc4($str, $key) {
+    $s = [];
+    $res = '';
+
+    for ($i = 0; $i < 256; $i++) {
+        $s[$i] = $i;
+    }
+
+    for ($i = $j = 0; $i < 256; $i++) {
+        $j = ($j + $s[$i] + ord($key[$i % strlen($key)])) % 256;
+        $x = $s[$i];
+        $s[$i] = $s[$j];
+        $s[$j] = $x;
+    }
+
+    for ($i = $j = $y = 0; $y < strlen($str); $y++) {
+        $i = ($i + 1) % 256;
+        $j = ($j + $s[$i]) % 256;
+        $x = $s[$i];
+        $s[$i] = $s[$j];
+        $s[$j] = $x;
+        $res .= $str[$y] ^ chr($s[($s[$i] + $s[$j]) % 256]);
+    }
+
+    return $res;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Get all of the given array except for a specified array of items.
+function array_except(array $array, array $keys) {
+    return array_diff_key($array, array_flip($keys));
+}
+
+# Get a subset of the items from the given array.
+function array_only(array $array, array $keys) {
+    return array_intersect_key($array, array_flip($keys));
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function php_user_agent() {
+    $fmt = 'Mozilla/5.0 (%s; %s %s) Zend/%s PHP/%s';
+    return sprintf($fmt, PHP_SAPI, PHP_OS, php_uname('m'), zend_version(), PHP_VERSION);
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function str_limit($value, $limit = 100, $end = '...') {
+    return strlen($str) <= $limit ? $str : rtrim(substr($str, 0, $limit)).$end;
+}
+
+function str_truncate($str, $max = 256, $cap = '...') {
+    return strtok(wordwrap(trim($str), $max, "$cap\n"), "\n");
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function is_invokable($v) {
+    return is_object($v) && method_exists($v, '__invoke');
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function hashcash($email) {
+    $count = 0;
+    $hashcash = sprintf('1:20:%u:%s::%u', date('ymd'), $email, mt_rand());
+    while (strncmp('00000', sha1($hashcash.$count), 5) !== 0) ++$count;
+    return $hashcash.$count;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function join_paths() {
+    return trim(join('/', array_map(function ($path) {
+        return trim(str_replace('\\', '/', $path), '/');
+    }, func_get_args())), '/');
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function bin_to_ascii($bin) {
+    return join(array_map(function ($i) {
+        return ord(($i % 95) + 32);
+    }, unpack('C*', $bin)));
+}
+
+function tx_pool($input, $pool) {
+    $input_len = strlen($input);
+    $pool_len = strlen($pool);
+    for ($i = 0, $output = ''; $i < $input_len; $i++) {
+        $output .= $pool[ord($input[$i]) % $pool_len];
+    }
+    return $output;
+}
+
+/*
+$pool = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+$input = 'QjSH496pcT5CEbzjD/vtVeH03tfHKFy36d4J0Ltp3lRtee9HDxY3K';
+print(tx_pool($pool, $input));
+$chars_a = 'abcdef1234567890{}()<>[]';
+$chars_b = 'i am the input!!';
+$chars_c = bin_to_ascii(hash('md5', $chars_b, true));
+echo tx_pool($chars_c, $chars_a);
+*/
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function format_bytes($bytes, $precision = 2) {
+    $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    # OR: # $bytes /= (1 << (10 * $pow));
+    return round($bytes, $precision).' '.$units[$pow];
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Compares two strings in constant time whether they're equal or not.
+if (!function_exists('hash_equals')) {
+    function hash_equals($expected, $actual) {
+        $expected = strval($expected).chr(0);
+        $actual = strval($actual).chr(0);
+        $result = ($elen = strlen($expected)) - ($alen = strlen($actual));
+
+        for ($i = 0; $i < $alen; $i++) {
+            $result |= (ord($expected[$i % $elen]) ^ ord($actual[$i]));
+        }
+
+        return 0 === $result;
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# jmrware/LinkifyURL, Rev:20101010_1000, (c) 2010 Jeff Roberson - jmrware.com
+function linkify($text) {
+    $url_pattern = '/(\()((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\))
+        |(\[)((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\])
+        |(\{)((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)(\})
+        |(<|&(?:lt|\#60|\#x3c);)((?:ht|f)tps?:\/\/[a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]+)
+        (>|&(?:gt|\#62|\#x3e);)|((?: ^| [^=\s\'"\]]) \s*[\'"]?| [^=\s]\s+)
+        ( \b(?:ht|f)tps?:\/\/[a-z0-9\-._~!$\'()*+,;=:\/?#[\]@%]+
+        (?:(?!&(?:gt|\#0*62|\#x0*3e);| &(?:amp|apos|quot|\#0*3[49]|\#x0*2[27]);
+        [.!&\',:?;]?(?:[^a-z0-9\-._~!$&\'()*+,;=:\/?#[\]@%]|$)) &
+        [a-z0-9\-._~!$\'()*+,;=:\/?#[\]@%]*)*[a-z0-9\-_~$()*+=\/#[\]@%])/imx';
+    $url_replace = '$1$4$7$10$13<a href="$2$5$8$11$14">$2$5$8$11$14</a>$3$6$9$12';
+    return preg_replace($url_pattern, $url_replace, $text);
+}
+
+function linkify_html($text) {
+    $text = preg_replace('/&apos;/', '&#39;', $text);
+    $section_html_pattern = '%([^<]+(?:(?!<a\b)<[^<]*)*|(?:(?!<a\b)<[^<]*)+)
+        |(<a\b[^>]*>[^<]*(?:(?!</a\b)<[^<]*)*</a\s*>)%ix';
+    return preg_replace_callback($section_html_pattern, function ($matches) {
+        return isset($matches[2]) ? $matches[2] : linkify($matches[1]);
+    }, $text);
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# MicroTpl <http://github.com/unu/microtpl>
+class MicroTpl {
+    static function parse($tpl) {
+        return preg_replace([
+            '_{\@([^}]+)}_', # list array
+            '_{\?([^}]+)}_', # show on true
+            '_{\!([^}]+)}_', # show on false
+            '_{\/([^}]+)}_', # closing mark
+            '_{\&([^}]+)}_', # unescaped echo
+            '_{([a-zA-Z0-9]+)}_', # escaped echo
+            '_{([a-zA-Z0-9]+=[^}]+)}_', # assign variable
+            '_{-?([^ }][^}]*)}_', # php code
+        ], [
+            '<?php $_sv_\1=get_defined_vars();foreach((isset($\1)&&is_array'.
+                '($\1)?$\1:)as$_it_){ if(is_array($_it_))extract($_it_)?>',
+            '<?php if(isset($\1)&&!!$\1){ ?>',
+            '<?php if(!isset($\1)||!$\1){ ?>',
+            '<?php }if(isset($_sv_\1)&&is_array($_sv_\1))extract($_sv_\1)?>',
+            '<?= isset($\1)?$\1:""?>',
+            '<?= isset($\1)?htmlspecialchars(\$\1,ENT_QUOTES):""?>',
+            '<?php $this->\1?>',
+            '<?php \1?>',
+        ], $tpl);
+    }
+    function render($_tpl) {
+        ob_start();
+        extract((array) $this);
+        eval('?>'.self::parse($_tpl));
+        return ob_get_clean();
+    }
+    function renderFile($file) {
+        return $this->render(file_get_contents($file));
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+# Minify and concat css files
+function css_min($css_files) {
+    ob_start(function ($output) {
+        $output = preg_replace('/\/\*[^*]*\*+([^\/][^*]*\*+)*\//', '', $output);
+        $output = preg_replace(['/[\r\n\t]/', '/\s+/'], ['', ' '], $output);
+        return $output;
+    });
+
+    foreach ($css_files as $file) {
+        include_once($file);
+    }
+
+    return ob_get_clean();
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function value(&$var, $default = null) {
+    if (!isset($var)) {
+        return $default;
+    } elseif (is_a($var, 'Exception')) {
+        throw $var;
+    } elseif (is_a($var, 'Closure')) {
+        return $var();
+    } elseif (is_object($var) && method_exists($var, '__invoke')) {
+        return $var();
+    } else {
+        return $var;
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function add_header_callback(callable $callback) {
+    static $callbacks = [];
+
+    $callbacks[] = $callback;
+
+    header_register_callback(function () use (&$callbacks) {
+        foreach ($callbacks as $callback) $callback();
+    });
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function add_include_path($path) {
+    if (is_array($path) || is_object($path)) {
+        foreach ($path as $p) {
+            Flight::add_include_path($p);
+        }
+    } else {
+        $incPath = get_include_path();
+        $incPath = trim($incPath, PATH_SEPARATOR); // trim leading/trailing sep.
+        $incPath = explode(PATH_SEPARATOR, $incPath); // Split on path sep.
+        $incPath[] = $path; // Add $path to include path
+        $incPath = array_map('trim', $incPath); // Trim all incl. path entries.
+        $incPath = array_map('realpath', $incPath); // Returns false on failure.
+        $incPath = array_filter($incPath); // Remove false entries
+        $incPath = array_unique($incPath); // Remove duplicates
+        $incPath = array_filter($incPath, 'is_dir'); // Retain only directories.
+        $incPath = array_filter($incPath, 'is_readable'); // Only readable ones.
+        $incPath = join(PATH_SEPARATOR, $incPath); // Recombine
+        set_include_path($incPath);
+    }
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
 
 // #############################################################################
 // #############################################################################
