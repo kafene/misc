@@ -198,18 +198,87 @@ function str_putcsv($input, $delimiter = ',', $enclosure = '"') {
 // #############################################################################
 
 function parse_xml($input) {
-    if (class_exists('SimpleXMLElement')) {
-        try {
-            $elbackup = libxml_disable_entity_loader(true);
-            $iebackup = libxml_use_internal_errors(true);
-            $result = new \SimpleXMLElement($input);
-            libxml_disable_entity_loader($elbackup);
-            libxml_use_internal_errors($iebackup);
-            return $result;
-        } catch (\Exception $e) {
-        }
-    }
+    try {
+        $flag = LIBXML_NOWARNING | LIBXML_NOERROR | LIBXML_NONET;
+        return new \SimpleXMLElement($input, $flag);
+    } catch (\Exception $e) {}
     return $input;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function encode_csv(array $input, $delimiter = ',', $enclosure = '"') {
+    $fp = fopen('php://temp/maxmemory:8388608', 'r+');
+    $i = 0;
+    foreach ($input as $fields) {
+        if ($i === 0) {
+            fputcsv($fp, array_keys($fields), $delimiter, $enclosure);
+            $i = 1;
+        }
+        fputcsv($fp, $fields, $delimiter, $enclosure);
+    }
+    $result = (string) stream_get_contents($fp, -1, 0);
+    fclose($fp);
+    return $result ? rtrim($result, "\n") : '';
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function parse_csv($input) {
+    $result = [];
+    # $fp = fopen('data://text/plain;base64,'.base64_encode($input), 'r');
+    $fp = fopen('php://memory', 'rw');
+    fwrite($fp, $input);
+    fseek($fp, 0);
+    while (false !== ($data = fgetcsv($fp))) {
+        $result[] = $data;
+    }
+    fclose($fp);
+    return $result;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function parse_http_digest($digestHeader) {
+    $required = [
+        'nonce' => 1,
+        'nc' => 1,
+        'cnonce' => 1,
+        'qop' => 1,
+        'username' => 1,
+        'uri' => 1,
+        'response' => 1,
+    ];
+    $result = [];
+    $digestHeader = preg_replace('/\s+/', ' ', $digestHeader);
+    $keys = join('|', array_keys($required));
+    $regex = '@('.$keys.')\s*=\s*(?:([\'"])([^\2]+?)\2|([^\s,]+))@';
+    preg_match_all($regex, $digestHeader, $matches, PREG_SET_ORDER);
+    foreach ($matches as $m) {
+        $result[$m[1]] = $m[3] ?: $m[4];
+        unset($required[$m[1]]);
+    }
+    return empty($required) ? $result : false;
+}
+
+// #############################################################################
+// #############################################################################
+// #############################################################################
+
+function parse_query_string($input) {
+    $result = [];
+    if (extension_loaded('mbstring')) {
+        mb_parse_str($input, $result);
+    } else {
+        parse_str($input, $result);
+    }
+    return $result;
 }
 
 // #############################################################################
