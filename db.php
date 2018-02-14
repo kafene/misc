@@ -215,3 +215,13 @@ class DB
         return $sql;
     }
 }
+
+/*
+DB::setDefault(DB::define('dev', function () {
+    return new \PDO('mysql:host=127.0.0.1;port=3306;dbname=<dbname>', '<username>', '<password>', [
+        \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
+        \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+        \PDO::ATTR_CASE               => \PDO::CASE_LOWER,
+    ]);
+}));
+*/
